@@ -1,0 +1,11 @@
+.normal-textfield .MuiOutlinedInput-notchedOutline {
+  border-color: #80ff00; /* Normal state border color */
+}
+
+.active-textfield .MuiOutlinedInput-notchedOutline {
+  border-color: #00ff00; /* Active state border color */
+}
+
+.active-textfield:hover .MuiOutlinedInput-notchedOutline {
+  border-color: #00ff00; /* Hover state border color */
+}
