@@ -1,5 +1,5 @@
 # AbyssNetwork
-An improved IRC
+An improved IRC *STILL IN DEVELOPMENT*
 
 cd into AbyssNet
 
