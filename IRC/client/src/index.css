@@ -1,10 +1,10 @@
 :root {
-  --abyss-neon: #80ff00;
-  --abyss-soft: #c6ff8d;
-  --abyss-bg: rgba(3, 5, 9, 0.72);
-  --abyss-panel: rgba(11, 14, 20, 0.8);
-  --abyss-border: rgba(128, 255, 0, 0.45);
-  --abyss-error: #ff5b5b;
+  --neon: #7bff1e;
+  --soft: #d2ffa9;
+  --line: rgba(123, 255, 30, 0.45);
+  --panel: rgba(7, 11, 18, 0.82);
+  --panel-2: rgba(8, 13, 22, 0.9);
+  --error: #ff7f7f;
 }
 
 * {
@@ -14,160 +14,178 @@
 body {
   margin: 0;
   font-family: "Trebuchet MS", "Segoe UI", sans-serif;
-  color: var(--abyss-neon);
+  color: var(--neon);
+  background: #020305;
 }
 
-.page {
+.ultraPage {
   min-height: 100vh;
-  background-position: center;
   background-size: cover;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1.5rem;
-  padding: 2rem;
-  position: relative;
-}
-
-.overlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 10;
-}
-
-.overlayCard {
-  border: 1px solid var(--abyss-border);
-  border-radius: 12px;
-  background: rgba(10, 12, 16, 0.95);
-  padding: 1rem 1.25rem;
-  min-width: 320px;
-}
-
-.mainPanel {
-  width: min(900px, 72vw);
-  min-height: 70vh;
-  border-radius: 14px;
-  border: 1px solid var(--abyss-border);
-  background: var(--abyss-bg);
-  backdrop-filter: blur(5px);
-  display: flex;
-  flex-direction: column;
+  background-position: center;
+  display: grid;
+  grid-template-columns: 260px 1fr 260px;
+  gap: 1rem;
   padding: 1rem;
 }
 
-.mainPanel h1 {
-  margin: 0;
-  border-bottom: 2px solid rgba(128, 255, 0, 0.5);
+.rail,
+.workspace,
+.members {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--panel);
+  backdrop-filter: blur(5px);
+}
+
+.rail,
+.members {
+  padding: 0.8rem;
+  overflow: auto;
+}
+
+.rail h2,
+.members h2 {
+  margin: 0 0 0.6rem;
+}
+
+.railSection h3 {
+  margin: 0.5rem 0;
+  color: var(--soft);
+}
+
+.railItem {
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(123, 255, 30, 0.22);
+  background: rgba(10, 16, 28, 0.6);
+  color: var(--soft);
+  border-radius: 8px;
+  padding: 0.5rem;
+  margin-bottom: 0.35rem;
+  cursor: pointer;
+}
+
+.railItem.active {
+  border-color: var(--neon);
+  color: var(--neon);
+}
+
+.workspace {
+  padding: 0.8rem;
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 2rem);
+}
+
+.workspaceHeader {
+  display: flex;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
   padding-bottom: 0.5rem;
 }
 
-.aliasForm {
-  margin-top: 1rem;
+.workspaceHeader h1 {
+  margin: 0;
+}
+
+.workspaceHeader p {
+  margin: 0.4rem 0 0;
+  color: var(--soft);
+}
+
+.sessionState {
+  text-align: right;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-  max-width: 320px;
+  gap: 0.2rem;
 }
 
-.aliasForm input,
-.composer input {
+.gateCard {
+  margin: 1rem 0;
+  border: 1px solid var(--line);
+  background: var(--panel-2);
+  border-radius: 10px;
+  padding: 0.8rem;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.gateCard input,
+.composerWrap input {
   width: 100%;
-  background: rgba(4, 7, 12, 0.7);
-  border: 1px solid var(--abyss-border);
   border-radius: 8px;
-  color: var(--abyss-soft);
-  padding: 0.65rem;
+  border: 1px solid var(--line);
+  background: rgba(1, 6, 12, 0.9);
+  color: var(--soft);
+  padding: 0.6rem;
 }
 
-.aliasForm button,
-.composer button {
-  background: rgba(111, 0, 255, 0.35);
-  color: var(--abyss-neon);
-  border: 1px solid var(--abyss-border);
+.gateCard button,
+.composerWrap button {
+  border: 1px solid var(--line);
   border-radius: 8px;
+  background: rgba(53, 0, 128, 0.45);
+  color: var(--neon);
   padding: 0.6rem 0.9rem;
   cursor: pointer;
 }
 
-.chatHeader {
-  margin-top: 0.5rem;
-  color: var(--abyss-soft);
-}
-
-.messages {
-  margin-top: 0.75rem;
+.timeline {
   flex: 1;
-  min-height: 45vh;
+  margin-top: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(5, 10, 20, 0.82);
   overflow: auto;
-  border-radius: 8px;
-  border: 1px solid rgba(128, 255, 0, 0.25);
-  background: var(--abyss-panel);
-  padding: 0.75rem;
+  padding: 0.7rem;
 }
 
-.messageRow,
-.noticeRow {
-  margin-bottom: 0.45rem;
+.msgRow {
+  margin-bottom: 0.4rem;
   word-break: break-word;
 }
 
-.timestamp {
-  color: #93a5bb;
+.msgTime {
+  color: #8ea1bc;
+  margin-right: 0.35rem;
+}
+
+.msgAuthor {
+  font-weight: 700;
+  color: var(--soft);
+  margin-right: 0.35rem;
+}
+
+.msgBody {
+  color: #c3e8ff;
+}
+
+.composerWrap {
+  margin-top: 0.7rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.7rem;
+}
+
+.commandHints {
+  margin-top: 0.4rem;
+  color: #9ed7ff;
   font-size: 0.9rem;
 }
 
-.messageBody {
-  color: var(--abyss-soft);
+.statusBar {
+  margin-top: 0.6rem;
+  color: var(--error);
 }
 
-.noticeRow {
-  color: var(--abyss-soft);
-}
-
-.composer {
-  margin-top: 0.75rem;
-  display: grid;
-  grid-template-columns: 1fr auto;
-  gap: 0.75rem;
-}
-
-.errorBar {
-  margin-top: 0.75rem;
-  color: var(--abyss-error);
-}
-
-.clientsPanel {
-  width: min(300px, 24vw);
-  min-height: 40vh;
-  border-radius: 12px;
-  border: 1px solid var(--abyss-border);
-  background: var(--abyss-bg);
-  backdrop-filter: blur(5px);
-  padding: 0.9rem;
-}
-
-.clientsPanel h2 {
-  margin-top: 0;
-}
-
-.clientsList {
-  display: flex;
-  flex-direction: column;
-  gap: 0.45rem;
-}
-
-@media (max-width: 980px) {
-  .page {
-    flex-direction: column;
-    align-items: stretch;
+@media (max-width: 1150px) {
+  .ultraPage {
+    grid-template-columns: 1fr;
   }
 
-  .mainPanel,
-  .clientsPanel {
-    width: 100%;
+  .workspace {
+    min-height: auto;
   }
 }

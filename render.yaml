@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: abyss-irc-server
+    name: abyss-irc-gateway
     runtime: node
     plan: free
     rootDir: IRC/server
@@ -13,6 +13,25 @@ services:
         value: 0.0.0.0
       - key: IRC_ALLOWED_ORIGINS
         value: https://abyss-irc-client.onrender.com
+      - key: RETENTION_DAYS
+        value: "30"
+      - key: IRC_STATE_PATH
+        value: /opt/render/project/data/irc-ultra-state.json
+      - key: E2EE_REQUIRED
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+
+  - type: worker
+    name: abyss-irc-bot-runner
+    runtime: node
+    plan: free
+    rootDir: IRC/bot-runner
+    buildCommand: node -v
+    startCommand: node index.js
+    autoDeploy: true
 
   - type: web
     name: abyss-irc-client
@@ -24,5 +43,5 @@ services:
       - key: VITE_IRC_SERVER_URL
         fromService:
           type: web
-          name: abyss-irc-server
+          name: abyss-irc-gateway
           envVarKey: RENDER_EXTERNAL_URL
