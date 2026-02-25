@@ -51,6 +51,25 @@ function normalizeIp(raw: string | undefined): string {
   return raw;
 }
 
+function extractForwardedIp(value: string | string[] | undefined): string | null {
+  if (!value) {
+    return null;
+  }
+
+  const raw = Array.isArray(value) ? value.join(",") : value;
+  const candidate = raw.split(",")[0]?.trim();
+  if (!candidate) {
+    return null;
+  }
+
+  const normalized = normalizeIp(candidate);
+  if (isIP(normalized) === 0) {
+    return null;
+  }
+
+  return normalized;
+}
+
 function isLoopbackIp(ip: string): boolean {
   return ip === "127.0.0.1" || ip === "::1";
 }
@@ -71,6 +90,21 @@ function normalizeClientIpHint(raw: unknown): string | null {
   }
 
   return normalized;
+}
+
+function getSocketIp(socket: Socket<ClientToServerEvents, ServerToClientEvents>): string {
+  const headers = socket.handshake.headers;
+
+  const forwarded =
+    extractForwardedIp(headers["x-forwarded-for"]) ||
+    extractForwardedIp(headers["x-real-ip"]) ||
+    extractForwardedIp(headers["cf-connecting-ip"]);
+
+  if (forwarded) {
+    return forwarded;
+  }
+
+  return normalizeIp(socket.handshake.address);
 }
 
 function isPrivateIpv4(hostname: string): boolean {
@@ -186,7 +220,7 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
     const state: ClientState = {
       clientId: socket.id,
       alias: null,
-      ip: normalizeIp(socket.handshake.address),
+      ip: getSocketIp(socket),
       connectedAt: nowIso(),
       messageTimestamps: []
     };
