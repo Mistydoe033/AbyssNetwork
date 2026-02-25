@@ -11,12 +11,9 @@ import {
   sanitizeAlias,
   sanitizeMessage
 } from "./utils/validation";
+import { formatTimestampMinutes, getUserColor } from "./utils/userFormatting";
 
 const ALIAS_KEY = "abyss_alias";
-
-function formatClient(client: PresenceClient): string {
-  return client.alias ? `${client.alias} (${client.ip})` : client.ip;
-}
 
 function App() {
   const [state, dispatch] = useReducer(chatReducer, initialChatState);
@@ -61,10 +58,7 @@ function App() {
     }
   }, [state.connection.connected, state.alias, localIpHint]);
 
-  const connectedClientLabels = useMemo(
-    () => state.clients.map(formatClient),
-    [state.clients]
-  );
+  const connectedClients = useMemo(() => state.clients, [state.clients]);
 
   const submitAlias = (event: FormEvent) => {
     event.preventDefault();
@@ -135,14 +129,20 @@ function App() {
             <div className="messages">
               {state.messages.map((entry) => (
                 <div className="messageRow" key={entry.messageId}>
-                  <strong>{entry.alias}</strong>
-                  <span className="messageIp">({entry.ip})</span>
+                  <span className="timestamp">[{formatTimestampMinutes(entry.timestamp)}]</span>{" "}
+                  <strong style={{ color: getUserColor(entry.clientId) }}>{entry.alias}</strong>
+                  <span className="messageIp"> ({entry.ip})</span>
                   <span>: {entry.text}</span>
                 </div>
               ))}
 
               {state.notices.map((notice, index) => (
-                <div className="noticeRow" key={`${notice.timestamp}-${index}`}>
+                <div
+                  className="noticeRow"
+                  key={`${notice.timestamp}-${index}`}
+                  style={{ color: getUserColor(notice.actorClientId) }}
+                >
+                  <span className="timestamp">[{formatTimestampMinutes(notice.timestamp)}]</span>{" "}
                   [{notice.code}] {notice.message}
                 </div>
               ))}
@@ -173,8 +173,10 @@ function App() {
       <aside className="clientsPanel">
         <h2>Connected Clients</h2>
         <div className="clientsList">
-          {connectedClientLabels.map((label, index) => (
-            <div key={`${label}-${index}`}>{label}</div>
+          {connectedClients.map((client) => (
+            <div key={client.clientId} style={{ color: getUserColor(client.clientId) }}>
+              {client.alias ? `${client.alias} (${client.ip})` : client.ip}
+            </div>
           ))}
         </div>
       </aside>

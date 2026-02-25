@@ -115,9 +115,13 @@ body {
   word-break: break-word;
 }
 
+.timestamp {
+  color: #93a5bb;
+  font-size: 0.9rem;
+}
+
 .messageIp {
   color: #b8e58f;
-  margin-left: 0.2rem;
 }
 
 .noticeRow {

@@ -33,6 +33,7 @@ export interface SystemNoticePayload {
   code: SystemNoticeCode;
   message: string;
   timestamp: string;
+  actorClientId?: string;
 }
 
 export interface ClientToServerEvents {
