@@ -39,7 +39,7 @@ export const initialChatState: ChatState = {
 
 export type ChatAction =
   | { type: "REQUEST_ALIAS"; alias: string }
-  | { type: "CLEAR_USER_CHAT"; alias: string; ip: string }
+  | { type: "CLEAR_USER_ACTIVITY"; clientId?: string; alias: string; ip?: string }
   | { type: "SET_CONNECTION"; connection: ConnectionState }
   | { type: "SET_CLIENTS"; clients: PresenceClient[] }
   | { type: "SET_HISTORY"; entries: HistoryEntryPayload[] }
@@ -90,14 +90,51 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         aliasPending: true,
         error: null
       };
-    case "CLEAR_USER_CHAT":
+    case "CLEAR_USER_ACTIVITY":
       return {
         ...state,
         timeline: state.timeline.filter(
-          (entry) =>
-            entry.kind !== "chat" ||
-            entry.message.alias !== action.alias ||
-            entry.message.ip !== action.ip
+          (entry) => {
+            if (entry.kind === "chat") {
+              if (action.clientId && entry.message.clientId === action.clientId) {
+                return false;
+              }
+
+              if (action.ip) {
+                return !(entry.message.alias === action.alias && entry.message.ip === action.ip);
+              }
+
+              return entry.message.alias !== action.alias;
+            }
+
+            if (entry.notice.code === "ALIAS_SET" && entry.notice.alias === action.alias) {
+              return false;
+            }
+
+            if (action.clientId && entry.notice.actorClientId === action.clientId) {
+              return false;
+            }
+
+            if (action.ip && entry.notice.code === "USER_LEFT") {
+              const expected = `${action.alias} (${action.ip}) disconnected.`;
+              if (entry.notice.message.includes(expected)) {
+                return false;
+              }
+            }
+
+            if (action.ip && entry.notice.code === "USER_JOINED") {
+              const joinedWithAlias = `${action.alias} joined from ${action.ip}.`;
+              const legacyJoined = `Client joined from ${action.ip}.`;
+              if (
+                entry.notice.message.includes(joinedWithAlias) ||
+                entry.notice.message.includes(legacyJoined)
+              ) {
+                return false;
+              }
+            }
+
+            return true;
+          }
         ),
         error: null
       };

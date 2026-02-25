@@ -14,6 +14,18 @@ export function parseChatInput(rawInput: string): ParsedChatInput {
     return { type: "empty" };
   }
 
+  if (text === "help") {
+    return { type: "help" };
+  }
+
+  if (text === "who") {
+    return { type: "who" };
+  }
+
+  if (text === "clear") {
+    return { type: "clear" };
+  }
+
   if (!text.startsWith("/")) {
     return { type: "plain", text };
   }

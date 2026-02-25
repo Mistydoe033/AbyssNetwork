@@ -7,15 +7,15 @@ function identityColorSeed(alias: string | null, ip: string): string {
 export class NoticeBuilder {
   constructor(private readonly nextSequence: () => number) {}
 
-  userJoined(clientId: string, ip: string, color: string): SystemNoticePayload {
+  userJoined(clientId: string, alias: string, ip: string, color: string): SystemNoticePayload {
     return {
       sequence: this.nextSequence(),
       code: "USER_JOINED",
-      message: `Client joined from ${ip}.`,
+      message: `${alias} joined from ${ip}.`,
       timestamp: new Date().toISOString(),
       actorClientId: clientId,
       actorColor: color,
-      actorColorSeed: identityColorSeed(null, ip)
+      actorColorSeed: identityColorSeed(alias, ip)
     };
   }
 

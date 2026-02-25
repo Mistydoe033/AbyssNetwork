@@ -107,16 +107,15 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
 
     const clientIp = getSocketIp(socket);
     const initialColor = pickDistinctColor(clientIp, clientRegistry.usedColors());
-    const client = clientRegistry.addClient(socket.id, clientIp, nowIso(), initialColor);
-
-    broadcastPresence();
-    emitNotice(socket.broadcast, noticeBuilder.userJoined(client.clientId, client.ip, client.color));
+    clientRegistry.addClient(socket.id, clientIp, nowIso(), initialColor);
 
     socket.on("register_alias", (payload) => {
       const currentClient = clientRegistry.getClient(socket.id);
       if (!currentClient) {
         return;
       }
+
+      const hadAlias = currentClient.alias !== null;
 
       const validatedAlias = validateAlias(payload?.alias);
       if (!validatedAlias.ok || !validatedAlias.value) {
@@ -169,6 +168,17 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
           updatedClient.color
         )
       );
+      if (!hadAlias) {
+        emitNotice(
+          socket.broadcast,
+          noticeBuilder.userJoined(
+            updatedClient.clientId,
+            validatedAlias.value,
+            updatedClient.ip,
+            updatedClient.color
+          )
+        );
+      }
       broadcastPresence();
     });
 
@@ -219,11 +229,16 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
 
     socket.on("disconnect", () => {
       const disconnected = clientRegistry.removeClient(socket.id);
-      broadcastPresence();
 
       if (!disconnected) {
         return;
       }
+
+      if (!disconnected.alias) {
+        return;
+      }
+
+      broadcastPresence();
 
       emitNotice(
         socket.broadcast,

@@ -158,12 +158,16 @@ function App() {
 
     if (parsed.type === "clear") {
       const self = state.clients.find((client) => client.alias === state.aliasConfirmed);
-      if (!self || !self.alias) {
-        dispatch({ type: "SET_ERROR", error: "Cannot resolve your current identity for /clear." });
-        return;
-      }
+      const lastOwnMessage = [...state.timeline]
+        .reverse()
+        .find((entry) => entry.kind === "chat" && entry.message.alias === state.aliasConfirmed);
 
-      dispatch({ type: "CLEAR_USER_CHAT", alias: self.alias, ip: self.ip });
+      dispatch({
+        type: "CLEAR_USER_ACTIVITY",
+        clientId: self?.clientId ?? (lastOwnMessage?.kind === "chat" ? lastOwnMessage.message.clientId : undefined),
+        alias: self?.alias ?? state.aliasConfirmed,
+        ip: self?.ip ?? (lastOwnMessage?.kind === "chat" ? lastOwnMessage.message.ip : undefined)
+      });
       setMessageInput("");
       return;
     }
@@ -226,7 +230,7 @@ function App() {
         {state.aliasConfirmed && state.error && <div className="errorBar">{state.error}</div>}
       </div>
 
-      <ConnectedClients clients={connectedClients} />
+      <ConnectedClients clients={connectedClients.filter((client) => !!client.alias)} />
     </div>
   );
 }
