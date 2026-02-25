@@ -1,15 +1,6 @@
-const USER_COLOR_PALETTE = [
-  "#79d7ff",
-  "#ffd57a",
-  "#9dff8a",
-  "#ff9dcc",
-  "#b9a3ff",
-  "#73f0d0",
-  "#ffb580",
-  "#f2ff93",
-  "#8ab7ff",
-  "#ff9a9a"
-];
+const HUE_BUCKETS = 36;
+const SATURATION_LEVELS = [74, 82, 90];
+const LIGHTNESS_LEVELS = [62, 68, 74];
 
 function hashString(value: string): number {
   let hash = 0;
@@ -24,8 +15,12 @@ export function getUserColor(seed: string | undefined): string {
     return "#c6ff8d";
   }
 
-  const index = hashString(seed) % USER_COLOR_PALETTE.length;
-  return USER_COLOR_PALETTE[index];
+  const hash = hashString(seed);
+  const hue = (hash % HUE_BUCKETS) * (360 / HUE_BUCKETS);
+  const saturation = SATURATION_LEVELS[(hash >>> 8) % SATURATION_LEVELS.length];
+  const lightness = LIGHTNESS_LEVELS[(hash >>> 16) % LIGHTNESS_LEVELS.length];
+
+  return `hsl(${hue} ${saturation}% ${lightness}%)`;
 }
 
 export function formatTimestampSeconds(timestamp: string): string {
