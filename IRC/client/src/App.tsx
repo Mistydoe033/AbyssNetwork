@@ -13,14 +13,14 @@ import { formatTimestampSeconds, getUserColor } from "./utils/userFormatting";
 
 const ALIAS_KEY = "abyss_alias";
 
+function identityColorSeed(alias: string | null, ip: string): string {
+  return alias ? `${alias}|${ip}` : ip;
+}
+
 function App() {
   const [state, dispatch] = useReducer(chatReducer, initialChatState);
   const [aliasInput, setAliasInput] = useState(localStorage.getItem(ALIAS_KEY) || "");
   const [messageInput, setMessageInput] = useState("");
-  const localIpHint = useMemo(() => {
-    const desktop = (window as Window & { abyssDesktop?: { localIp?: string | null } }).abyssDesktop;
-    return desktop?.localIp ?? null;
-  }, []);
 
   useEffect(() => {
     const stopConnection = chatSocket.onConnection((connection) => {
@@ -57,9 +57,9 @@ function App() {
 
   useEffect(() => {
     if (state.connection.connected && state.alias) {
-      chatSocket.registerAlias(state.alias, localIpHint);
+      chatSocket.registerAlias(state.alias);
     }
-  }, [state.connection.connected, state.alias, localIpHint]);
+  }, [state.connection.connected, state.alias]);
 
   const connectedClients = useMemo(() => state.clients, [state.clients]);
 
@@ -133,7 +133,7 @@ function App() {
               {state.timeline.map((entry) => {
                 if (entry.kind === "chat") {
                   const message = entry.message;
-                  const color = getUserColor(message.clientId);
+                  const color = getUserColor(identityColorSeed(message.alias, message.ip));
 
                   return (
                     <div className="messageRow" key={`chat-${message.sequence}`}>
@@ -153,7 +153,7 @@ function App() {
                   <div
                     className="noticeRow"
                     key={`notice-${notice.sequence}`}
-                    style={{ color: getUserColor(notice.actorClientId) }}
+                    style={{ color: getUserColor(notice.actorColorSeed ?? notice.actorClientId) }}
                   >
                     <span className="timestamp">[{formatTimestampSeconds(notice.timestamp)}]</span>{" "}
                     [{notice.code}] {notice.message}
@@ -188,7 +188,10 @@ function App() {
         <h2>Connected Clients</h2>
         <div className="clientsList">
           {connectedClients.map((client) => (
-            <div key={client.clientId} style={{ color: getUserColor(client.clientId) }}>
+            <div
+              key={client.clientId}
+              style={{ color: getUserColor(identityColorSeed(client.alias, client.ip)) }}
+            >
               {client.alias ? `${client.alias} (${client.ip})` : client.ip}
             </div>
           ))}

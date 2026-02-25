@@ -2,7 +2,6 @@ export type SystemNoticeCode = "ALIAS_SET" | "USER_JOINED" | "USER_LEFT" | "ERRO
 
 export interface RegisterAliasPayload {
   alias: string;
-  clientIpHint?: string;
 }
 
 export interface ChatSendPayload {
@@ -36,6 +35,7 @@ export interface SystemNoticePayload {
   message: string;
   timestamp: string;
   actorClientId?: string;
+  actorColorSeed?: string;
 }
 
 export type HistoryEntryPayload =

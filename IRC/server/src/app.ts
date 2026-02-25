@@ -72,28 +72,6 @@ function extractForwardedIp(value: string | string[] | undefined): string | null
   return normalized;
 }
 
-function isLoopbackIp(ip: string): boolean {
-  return ip === "127.0.0.1" || ip === "::1";
-}
-
-function normalizeClientIpHint(raw: unknown): string | null {
-  if (typeof raw !== "string") {
-    return null;
-  }
-
-  const value = raw.trim();
-  if (!value) {
-    return null;
-  }
-
-  const normalized = normalizeIp(value);
-  if (isIP(normalized) === 0 || isLoopbackIp(normalized)) {
-    return null;
-  }
-
-  return normalized;
-}
-
 function getSocketIp(socket: Socket<ClientToServerEvents, ServerToClientEvents>): string {
   const headers = socket.handshake.headers;
 
@@ -180,6 +158,10 @@ function canSendMessage(
   return true;
 }
 
+function identityColorSeed(alias: string | null, ip: string): string {
+  return alias ? `${alias}|${ip}` : ip;
+}
+
 type NoticeTarget = {
   emit: (event: "system_notice", payload: SystemNoticePayload) => void;
 };
@@ -235,6 +217,7 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
     code: SystemNoticeCode,
     message: string,
     actorClientId?: string,
+    actorColorSeed?: string,
     persist = false
   ): SystemNoticePayload => {
     const notice: SystemNoticePayload = {
@@ -242,7 +225,8 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
       code,
       message,
       timestamp: nowIso(),
-      ...(actorClientId ? { actorClientId } : {})
+      ...(actorClientId ? { actorClientId } : {}),
+      ...(actorColorSeed ? { actorColorSeed } : {})
     };
 
     target.emit("system_notice", notice);
@@ -274,7 +258,14 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
 
     clients.set(socket.id, state);
     broadcastPresence();
-    emitNotice(socket.broadcast, "USER_JOINED", `Client joined from ${state.ip}.`, state.clientId, true);
+    emitNotice(
+      socket.broadcast,
+      "USER_JOINED",
+      `Client joined from ${state.ip}.`,
+      state.clientId,
+      identityColorSeed(null, state.ip),
+      true
+    );
 
     socket.on("register_alias", (payload) => {
       const result = validateAlias(payload?.alias);
@@ -288,13 +279,15 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
         return;
       }
 
-      const hintedIp = normalizeClientIpHint(payload?.clientIpHint);
-      if (hintedIp && isLoopbackIp(current.ip)) {
-        current.ip = hintedIp;
-      }
-
       current.alias = result.value;
-      emitNotice(socket, "ALIAS_SET", `Alias set to ${result.value}.`, current.clientId, true);
+      emitNotice(
+        socket,
+        "ALIAS_SET",
+        `Alias set to ${result.value}.`,
+        current.clientId,
+        identityColorSeed(current.alias, current.ip),
+        true
+      );
       broadcastPresence();
     });
 
@@ -342,7 +335,14 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
 
       if (disconnected) {
         const label = disconnected.alias ? `${disconnected.alias} (${disconnected.ip})` : disconnected.ip;
-        emitNotice(socket.broadcast, "USER_LEFT", `${label} disconnected.`, disconnected.clientId, true);
+        emitNotice(
+          socket.broadcast,
+          "USER_LEFT",
+          `${label} disconnected.`,
+          disconnected.clientId,
+          identityColorSeed(disconnected.alias, disconnected.ip),
+          true
+        );
       }
     });
   });

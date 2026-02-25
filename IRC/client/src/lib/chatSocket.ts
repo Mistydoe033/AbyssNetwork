@@ -147,10 +147,8 @@ class ChatSocket {
     };
   }
 
-  registerAlias(alias: string, clientIpHint?: string | null): boolean {
-    const payload: RegisterAliasPayload = clientIpHint
-      ? { alias, clientIpHint }
-      : { alias };
+  registerAlias(alias: string): boolean {
+    const payload: RegisterAliasPayload = { alias };
     return this.emitOrQueue(() => {
       this.socket.emit("register_alias", payload);
     });
