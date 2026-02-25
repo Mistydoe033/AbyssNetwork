@@ -1,5 +1,7 @@
 export type SystemNoticeCode = "ALIAS_SET" | "USER_JOINED" | "USER_LEFT" | "ERROR";
 
+export type NoticeErrorKey = "ALIAS_IN_USE" | "ALIAS_INVALID" | "MESSAGE_INVALID" | "RATE_LIMIT";
+
 export interface RegisterAliasPayload {
   alias: string;
 }
@@ -36,6 +38,8 @@ export interface SystemNoticePayload {
   timestamp: string;
   actorClientId?: string;
   actorColorSeed?: string;
+  alias?: string;
+  errorKey?: NoticeErrorKey;
 }
 
 export type HistoryEntryPayload =

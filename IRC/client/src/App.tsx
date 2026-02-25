@@ -1,6 +1,9 @@
 import { FormEvent, useEffect, useMemo, useReducer, useState } from "react";
 
 import bgImage from "./assets/HBG.jpg";
+import { AliasGate } from "./components/AliasGate";
+import { ConnectedClients } from "./components/ConnectedClients";
+import { Timeline } from "./components/Timeline";
 import { chatSocket } from "./lib/chatSocket";
 import { chatReducer, initialChatState } from "./state/chatState";
 import {
@@ -9,13 +12,8 @@ import {
   sanitizeAlias,
   sanitizeMessage
 } from "./utils/validation";
-import { formatTimestampSeconds, getUserColor } from "./utils/userFormatting";
 
 const ALIAS_KEY = "abyss_alias";
-
-function identityColorSeed(alias: string | null, ip: string): string {
-  return alias ? `${alias}|${ip}` : ip;
-}
 
 function App() {
   const [state, dispatch] = useReducer(chatReducer, initialChatState);
@@ -40,10 +38,7 @@ function App() {
     });
 
     const stopNotices = chatSocket.onNotice((payload) => {
-      dispatch({ type: "ADD_NOTICE", notice: payload });
-      if (payload.code === "ERROR") {
-        dispatch({ type: "SET_ERROR", error: payload.message });
-      }
+      dispatch({ type: "RECEIVE_NOTICE", notice: payload });
     });
 
     return () => {
@@ -56,10 +51,16 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (state.connection.connected && state.alias) {
-      chatSocket.registerAlias(state.alias);
+    if (state.connection.connected && state.aliasPending && state.aliasRequested) {
+      chatSocket.registerAlias(state.aliasRequested);
     }
-  }, [state.connection.connected, state.alias]);
+  }, [state.connection.connected, state.aliasPending, state.aliasRequested]);
+
+  useEffect(() => {
+    if (state.aliasConfirmed) {
+      localStorage.setItem(ALIAS_KEY, state.aliasConfirmed);
+    }
+  }, [state.aliasConfirmed]);
 
   const connectedClients = useMemo(() => state.clients, [state.clients]);
 
@@ -72,14 +73,16 @@ function App() {
       return;
     }
 
-    localStorage.setItem(ALIAS_KEY, alias);
-    dispatch({ type: "SET_ALIAS", alias });
-    dispatch({ type: "SET_ERROR", error: null });
+    dispatch({ type: "REQUEST_ALIAS", alias });
   };
 
   const sendMessage = () => {
-    const cleaned = sanitizeMessage(messageInput);
+    if (!state.aliasConfirmed) {
+      dispatch({ type: "SET_ERROR", error: "Set an alias before sending messages." });
+      return;
+    }
 
+    const cleaned = sanitizeMessage(messageInput);
     if (!isValidMessage(cleaned)) {
       dispatch({ type: "SET_ERROR", error: "Message must be 1-1000 chars with no control characters." });
       return;
@@ -115,52 +118,18 @@ function App() {
       <div className="mainPanel">
         <h1>The Abyss</h1>
 
-        {!state.alias ? (
-          <form className="aliasForm" onSubmit={submitAlias}>
-            <p>Step into the Abyss. Darkness awaits.</p>
-            <input
-              value={aliasInput}
-              onChange={(event) => setAliasInput(event.target.value)}
-              placeholder="Alias"
-              maxLength={24}
-            />
-            <button type="submit">Enter Chat</button>
-          </form>
+        {!state.aliasConfirmed ? (
+          <AliasGate
+            aliasInput={aliasInput}
+            aliasPending={state.aliasPending}
+            error={state.error}
+            onAliasInputChange={setAliasInput}
+            onSubmit={submitAlias}
+          />
         ) : (
           <>
-            <div className="chatHeader">Logged in as {state.alias}</div>
-            <div className="messages">
-              {state.timeline.map((entry) => {
-                if (entry.kind === "chat") {
-                  const message = entry.message;
-                  const color = getUserColor(identityColorSeed(message.alias, message.ip));
-
-                  return (
-                    <div className="messageRow" key={`chat-${message.sequence}`}>
-                      <span className="timestamp">[{formatTimestampSeconds(message.timestamp)}]</span>{" "}
-                      <span className="messageBody" style={{ color }}>
-                        <strong>{message.alias}</strong>
-                        <span> ({message.ip})</span>
-                        <span>: {message.text}</span>
-                      </span>
-                    </div>
-                  );
-                }
-
-                const notice = entry.notice;
-
-                return (
-                  <div
-                    className="noticeRow"
-                    key={`notice-${notice.sequence}`}
-                    style={{ color: getUserColor(notice.actorColorSeed ?? notice.actorClientId) }}
-                  >
-                    <span className="timestamp">[{formatTimestampSeconds(notice.timestamp)}]</span>{" "}
-                    [{notice.code}] {notice.message}
-                  </div>
-                );
-              })}
-            </div>
+            <div className="chatHeader">Logged in as {state.aliasConfirmed}</div>
+            <Timeline entries={state.timeline} />
 
             <div className="composer">
               <input
@@ -181,22 +150,10 @@ function App() {
           </>
         )}
 
-        {state.error && <div className="errorBar">{state.error}</div>}
+        {state.aliasConfirmed && state.error && <div className="errorBar">{state.error}</div>}
       </div>
 
-      <aside className="clientsPanel">
-        <h2>Connected Clients</h2>
-        <div className="clientsList">
-          {connectedClients.map((client) => (
-            <div
-              key={client.clientId}
-              style={{ color: getUserColor(identityColorSeed(client.alias, client.ip)) }}
-            >
-              {client.alias ? `${client.alias} (${client.ip})` : client.ip}
-            </div>
-          ))}
-        </div>
-      </aside>
+      <ConnectedClients clients={connectedClients} />
     </div>
   );
 }

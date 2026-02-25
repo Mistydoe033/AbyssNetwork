@@ -5,6 +5,8 @@ import type {
   SystemNoticePayload
 } from "@abyss/irc-shared";
 
+import { isAliasErrorNotice, isAliasSetNotice } from "../utils/noticeMeta";
+
 export interface ConnectionState {
   connected: boolean;
   reconnecting: boolean;
@@ -12,7 +14,9 @@ export interface ConnectionState {
 }
 
 export interface ChatState {
-  alias: string | null;
+  aliasRequested: string | null;
+  aliasConfirmed: string | null;
+  aliasPending: boolean;
   connection: ConnectionState;
   clients: PresenceClient[];
   timeline: HistoryEntryPayload[];
@@ -20,7 +24,9 @@ export interface ChatState {
 }
 
 export const initialChatState: ChatState = {
-  alias: null,
+  aliasRequested: null,
+  aliasConfirmed: null,
+  aliasPending: false,
   connection: {
     connected: false,
     reconnecting: true,
@@ -32,12 +38,12 @@ export const initialChatState: ChatState = {
 };
 
 export type ChatAction =
-  | { type: "SET_ALIAS"; alias: string }
+  | { type: "REQUEST_ALIAS"; alias: string }
   | { type: "SET_CONNECTION"; connection: ConnectionState }
   | { type: "SET_CLIENTS"; clients: PresenceClient[] }
   | { type: "SET_HISTORY"; entries: HistoryEntryPayload[] }
   | { type: "ADD_MESSAGE"; message: ChatReceivePayload }
-  | { type: "ADD_NOTICE"; notice: SystemNoticePayload }
+  | { type: "RECEIVE_NOTICE"; notice: SystemNoticePayload }
   | { type: "SET_ERROR"; error: string | null };
 
 function entrySequence(entry: HistoryEntryPayload): number {
@@ -76,16 +82,29 @@ function appendOrdered(stateEntries: HistoryEntryPayload[], nextEntry: HistoryEn
 
 export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
-    case "SET_ALIAS":
+    case "REQUEST_ALIAS":
       return {
         ...state,
-        alias: action.alias
+        aliasRequested: action.alias,
+        aliasPending: true,
+        error: null
       };
-    case "SET_CONNECTION":
+    case "SET_CONNECTION": {
+      if (!action.connection.connected && state.aliasConfirmed) {
+        return {
+          ...state,
+          connection: action.connection,
+          aliasRequested: state.aliasConfirmed,
+          aliasConfirmed: null,
+          aliasPending: true
+        };
+      }
+
       return {
         ...state,
         connection: action.connection
       };
+    }
     case "SET_CLIENTS":
       return {
         ...state,
@@ -101,11 +120,42 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...state,
         timeline: appendOrdered(state.timeline, { kind: "chat", message: action.message })
       };
-    case "ADD_NOTICE":
+    case "RECEIVE_NOTICE": {
+      const timeline = appendOrdered(state.timeline, { kind: "notice", notice: action.notice });
+
+      if (isAliasSetNotice(action.notice)) {
+        return {
+          ...state,
+          timeline,
+          aliasRequested: action.notice.alias,
+          aliasConfirmed: action.notice.alias,
+          aliasPending: false,
+          error: null
+        };
+      }
+
+      if (isAliasErrorNotice(action.notice)) {
+        return {
+          ...state,
+          timeline,
+          aliasPending: false,
+          error: action.notice.message
+        };
+      }
+
+      if (action.notice.code === "ERROR") {
+        return {
+          ...state,
+          timeline,
+          error: action.notice.message
+        };
+      }
+
       return {
         ...state,
-        timeline: appendOrdered(state.timeline, { kind: "notice", notice: action.notice })
+        timeline
       };
+    }
     case "SET_ERROR":
       return {
         ...state,

@@ -1,27 +1,20 @@
-import { createServer as createHttpServer } from "node:http";
 import { randomUUID } from "node:crypto";
-import { isIP } from "node:net";
-import { Server, type Socket } from "socket.io";
+import { createServer as createHttpServer } from "node:http";
+
+import { Server } from "socket.io";
 
 import type {
   ChatReceivePayload,
   ClientToServerEvents,
-  HistoryEntryPayload,
-  PresenceClient,
-  ServerToClientEvents,
-  SystemNoticeCode,
-  SystemNoticePayload
+  ServerToClientEvents
 } from "@abyss/irc-shared";
 
+import { ClientRegistry, type ClientState } from "./domain/clientRegistry.js";
+import { HistoryStore } from "./domain/historyStore.js";
+import { NoticeBuilder } from "./domain/noticeBuilder.js";
+import { getSocketIp } from "./net/ip.js";
+import { isOriginAllowed } from "./net/originPolicy.js";
 import { validateAlias, validateMessage } from "./validation.js";
-
-interface ClientState {
-  clientId: string;
-  alias: string | null;
-  ip: string;
-  connectedAt: string;
-  messageTimestamps: number[];
-}
 
 export interface ServerConfig {
   host: string;
@@ -43,127 +36,24 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
-function normalizeIp(raw: string | undefined): string {
-  if (!raw) {
-    return "unknown";
-  }
-  if (raw.startsWith("::ffff:")) {
-    return raw.slice(7);
-  }
-  return raw;
-}
-
-function extractForwardedIp(value: string | string[] | undefined): string | null {
-  if (!value) {
-    return null;
-  }
-
-  const raw = Array.isArray(value) ? value.join(",") : value;
-  const candidate = raw.split(",")[0]?.trim();
-  if (!candidate) {
-    return null;
-  }
-
-  const normalized = normalizeIp(candidate);
-  if (isIP(normalized) === 0) {
-    return null;
-  }
-
-  return normalized;
-}
-
-function getSocketIp(socket: Socket<ClientToServerEvents, ServerToClientEvents>): string {
-  const headers = socket.handshake.headers;
-
-  const forwarded =
-    extractForwardedIp(headers["x-forwarded-for"]) ||
-    extractForwardedIp(headers["x-real-ip"]) ||
-    extractForwardedIp(headers["cf-connecting-ip"]);
-
-  if (forwarded) {
-    return forwarded;
-  }
-
-  return normalizeIp(socket.handshake.address);
-}
-
-function isPrivateIpv4(hostname: string): boolean {
-  const ipv4Match = hostname.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
-  if (!ipv4Match) {
-    return false;
-  }
-
-  const first = Number(ipv4Match[1]);
-  const second = Number(ipv4Match[2]);
-
-  if (first === 10) {
-    return true;
-  }
-  if (first === 172 && second >= 16 && second <= 31) {
-    return true;
-  }
-  if (first === 192 && second === 168) {
-    return true;
-  }
-  return false;
-}
-
-function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
-  if (allowedOrigins.includes("*")) {
-    return true;
-  }
-
-  if (!origin || origin === "null") {
-    return true;
-  }
-
-  try {
-    const url = new URL(origin);
-    const hostname = url.hostname;
-
-    if (["localhost", "127.0.0.1", "::1"].includes(hostname)) {
-      return true;
-    }
-
-    if (isPrivateIpv4(hostname)) {
-      return true;
-    }
-
-    return allowedOrigins.includes(origin) || allowedOrigins.includes(hostname);
-  } catch {
-    return false;
-  }
-}
-
-function toPresenceClient(state: ClientState): PresenceClient {
-  return {
-    clientId: state.clientId,
-    alias: state.alias,
-    ip: state.ip,
-    connectedAt: state.connectedAt
-  };
-}
-
 function canSendMessage(
-  state: ClientState,
+  client: ClientState,
   now: number,
   maxCount: number,
   windowMs: number
 ): boolean {
-  state.messageTimestamps = state.messageTimestamps.filter((ts) => now - ts <= windowMs);
-  if (state.messageTimestamps.length >= maxCount) {
+  client.messageTimestamps = client.messageTimestamps.filter((ts) => now - ts <= windowMs);
+
+  if (client.messageTimestamps.length >= maxCount) {
     return false;
   }
-  state.messageTimestamps.push(now);
+
+  client.messageTimestamps.push(now);
   return true;
 }
 
-function identityColorSeed(alias: string | null, ip: string): string {
-  return alias ? `${alias}|${ip}` : ip;
-}
-
 type NoticeTarget = {
-  emit: (event: "system_notice", payload: SystemNoticePayload) => void;
+  emit: (event: "system_notice", payload: Parameters<ServerToClientEvents["system_notice"]>[0]) => void;
 };
 
 export function createChatServer(overrides: Partial<ServerConfig> = {}) {
@@ -179,6 +69,7 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
     res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
     res.end("not found");
   });
+
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     transports: ["websocket"],
     allowUpgrades: false,
@@ -188,162 +79,124 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
           callback(null, true);
           return;
         }
+
         callback(new Error("Origin not allowed"));
       }
     }
   });
 
-  const clients = new Map<string, ClientState>();
-  const history: HistoryEntryPayload[] = [];
-  let sequence = 0;
+  const clientRegistry = new ClientRegistry();
+  const historyStore = new HistoryStore();
+  const noticeBuilder = new NoticeBuilder(() => historyStore.nextSequence());
 
-  const nextSequence = (): number => {
-    sequence += 1;
-    return sequence;
-  };
-
-  const appendHistory = (entry: HistoryEntryPayload) => {
-    history.push(entry);
+  const emitNotice = (target: NoticeTarget, payload: Parameters<ServerToClientEvents["system_notice"]>[0]) => {
+    target.emit("system_notice", payload);
   };
 
   const broadcastPresence = () => {
     io.emit("presence_update", {
-      clients: Array.from(clients.values()).map(toPresenceClient)
+      clients: clientRegistry.listPresence()
     });
-  };
-
-  const emitNotice = (
-    target: NoticeTarget,
-    code: SystemNoticeCode,
-    message: string,
-    actorClientId?: string,
-    actorColorSeed?: string,
-    persist = false
-  ): SystemNoticePayload => {
-    const notice: SystemNoticePayload = {
-      sequence: nextSequence(),
-      code,
-      message,
-      timestamp: nowIso(),
-      ...(actorClientId ? { actorClientId } : {}),
-      ...(actorColorSeed ? { actorColorSeed } : {})
-    };
-
-    target.emit("system_notice", notice);
-
-    if (persist) {
-      appendHistory({ kind: "notice", notice });
-    }
-
-    return notice;
-  };
-
-  const emitChat = (message: ChatReceivePayload) => {
-    io.emit("chat_receive", message);
-    appendHistory({ kind: "chat", message });
   };
 
   io.on("connection", (socket) => {
     socket.emit("history_snapshot", {
-      entries: [...history]
+      entries: historyStore.snapshot()
     });
 
-    const state: ClientState = {
-      clientId: socket.id,
-      alias: null,
-      ip: getSocketIp(socket),
-      connectedAt: nowIso(),
-      messageTimestamps: []
-    };
+    const client = clientRegistry.addClient(socket.id, getSocketIp(socket), nowIso());
 
-    clients.set(socket.id, state);
     broadcastPresence();
-    emitNotice(
-      socket.broadcast,
-      "USER_JOINED",
-      `Client joined from ${state.ip}.`,
-      state.clientId,
-      identityColorSeed(null, state.ip),
-      true
-    );
+    emitNotice(socket.broadcast, noticeBuilder.userJoined(client.clientId, client.ip));
 
     socket.on("register_alias", (payload) => {
-      const result = validateAlias(payload?.alias);
-      if (!result.ok || !result.value) {
-        emitNotice(socket, "ERROR", result.error ?? "Invalid alias.");
+      const validatedAlias = validateAlias(payload?.alias);
+      if (!validatedAlias.ok || !validatedAlias.value) {
+        emitNotice(
+          socket,
+          noticeBuilder.error(validatedAlias.error ?? "Invalid alias.", "ALIAS_INVALID")
+        );
         return;
       }
 
-      const current = clients.get(socket.id);
-      if (!current) {
+      const aliasResult = clientRegistry.setAliasIfAvailable(socket.id, validatedAlias.value);
+      if (!aliasResult.ok) {
+        if (aliasResult.reason === "ALIAS_IN_USE") {
+          emitNotice(
+            socket,
+            noticeBuilder.error(`Alias ${validatedAlias.value} is already in use.`, "ALIAS_IN_USE")
+          );
+        }
         return;
       }
 
-      current.alias = result.value;
+      if (!aliasResult.changed) {
+        return;
+      }
+
       emitNotice(
         socket,
-        "ALIAS_SET",
-        `Alias set to ${result.value}.`,
-        current.clientId,
-        identityColorSeed(current.alias, current.ip),
-        true
+        noticeBuilder.aliasSet(aliasResult.client.clientId, validatedAlias.value, aliasResult.client.ip)
       );
       broadcastPresence();
     });
 
     socket.on("chat_send", (payload) => {
-      const current = clients.get(socket.id);
-      if (!current) {
+      const currentClient = clientRegistry.getClient(socket.id);
+      if (!currentClient) {
         return;
       }
 
       const validation = validateMessage(payload?.text);
       if (!validation.ok || !validation.value) {
-        emitNotice(socket, "ERROR", validation.error ?? "Invalid message.");
+        emitNotice(
+          socket,
+          noticeBuilder.error(validation.error ?? "Invalid message.", "MESSAGE_INVALID")
+        );
         return;
       }
 
       const allowed = canSendMessage(
-        current,
+        currentClient,
         Date.now(),
         config.messageRateLimitCount,
         config.messageRateLimitWindowMs
       );
 
       if (!allowed) {
-        emitNotice(socket, "ERROR", "Rate limit exceeded: max 10 messages per 5 seconds.");
+        emitNotice(
+          socket,
+          noticeBuilder.error("Rate limit exceeded: max 10 messages per 5 seconds.", "RATE_LIMIT")
+        );
         return;
       }
 
       const message: ChatReceivePayload = {
-        sequence: nextSequence(),
+        sequence: historyStore.nextSequence(),
         messageId: randomUUID(),
-        clientId: current.clientId,
-        alias: current.alias ?? current.ip,
-        ip: current.ip,
+        clientId: currentClient.clientId,
+        alias: currentClient.alias ?? currentClient.ip,
+        ip: currentClient.ip,
         text: validation.value,
         timestamp: nowIso()
       };
 
-      emitChat(message);
+      historyStore.appendChat(message);
+      io.emit("chat_receive", message);
     });
 
     socket.on("disconnect", () => {
-      const disconnected = clients.get(socket.id);
-      clients.delete(socket.id);
+      const disconnected = clientRegistry.removeClient(socket.id);
       broadcastPresence();
 
-      if (disconnected) {
-        const label = disconnected.alias ? `${disconnected.alias} (${disconnected.ip})` : disconnected.ip;
-        emitNotice(
-          socket.broadcast,
-          "USER_LEFT",
-          `${label} disconnected.`,
-          disconnected.clientId,
-          identityColorSeed(disconnected.alias, disconnected.ip),
-          true
-        );
+      if (!disconnected) {
+        return;
       }
+
+      emitNotice(
+        socket.broadcast,
+        noticeBuilder.userLeft(disconnected.clientId, disconnected.alias, disconnected.ip)
+      );
     });
   });
 
@@ -389,8 +242,6 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
   return {
     start,
     stop,
-    getPort,
-    clients,
-    history
+    getPort
   };
 }
