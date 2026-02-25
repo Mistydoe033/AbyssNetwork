@@ -213,11 +213,14 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
     });
   };
 
-  const emitNotice = (
-    target: typeof io | Socket<ClientToServerEvents, ServerToClientEvents>,
-    code: SystemNoticeCode,
-    message: string
-  ) => {
+  type NoticeTarget = {
+    emit: (
+      event: "system_notice",
+      payload: { code: SystemNoticeCode; message: string; timestamp: string }
+    ) => void;
+  };
+
+  const emitNotice = (target: NoticeTarget, code: SystemNoticeCode, message: string) => {
     target.emit("system_notice", {
       code,
       message,
@@ -236,7 +239,7 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
 
     clients.set(socket.id, state);
     broadcastPresence();
-    emitNotice(io, "USER_JOINED", `Client joined from ${state.ip}.`);
+    emitNotice(socket.broadcast, "USER_JOINED", `Client joined from ${state.ip}.`);
 
     socket.on("register_alias", (payload) => {
       const result = validateAlias(payload?.alias);
@@ -303,7 +306,7 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
 
       if (disconnected) {
         const label = disconnected.alias ? `${disconnected.alias} (${disconnected.ip})` : disconnected.ip;
-        emitNotice(io, "USER_LEFT", `${label} disconnected.`);
+        emitNotice(socket.broadcast, "USER_LEFT", `${label} disconnected.`);
       }
     });
   });
