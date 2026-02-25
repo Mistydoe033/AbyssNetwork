@@ -15,7 +15,10 @@ export function ConnectedClients({ clients }: ConnectedClientsProps) {
         {clients.map((client) => (
           <div
             key={client.clientId}
-            style={{ color: getUserColor(identityColorSeed(client.alias, client.ip)) }}
+            style={{
+              color:
+                client.color ?? getUserColor(identityColorSeed(client.alias, client.ip))
+            }}
           >
             {client.alias ? `${client.alias} (${client.ip})` : client.ip}
           </div>

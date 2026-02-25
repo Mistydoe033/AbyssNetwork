@@ -13,7 +13,8 @@ export function Timeline({ entries }: TimelineProps) {
       {entries.map((entry) => {
         if (entry.kind === "chat") {
           const message = entry.message;
-          const color = getUserColor(identityColorSeed(message.alias, message.ip));
+          const color =
+            message.color ?? getUserColor(identityColorSeed(message.alias, message.ip));
 
           return (
             <div className="messageRow" key={`chat-${message.sequence}`}>
@@ -32,7 +33,11 @@ export function Timeline({ entries }: TimelineProps) {
           <div
             className="noticeRow"
             key={`notice-${notice.sequence}`}
-            style={{ color: getUserColor(notice.actorColorSeed ?? notice.actorClientId) }}
+            style={{
+              color:
+                notice.actorColor ??
+                getUserColor(notice.actorColorSeed ?? notice.actorClientId)
+            }}
           >
             <span className="timestamp">[{formatTimestampSeconds(notice.timestamp)}]</span>{" "}
             [{notice.code}] {notice.message}

@@ -39,6 +39,7 @@ export const initialChatState: ChatState = {
 
 export type ChatAction =
   | { type: "REQUEST_ALIAS"; alias: string }
+  | { type: "CLEAR_USER_CHAT"; alias: string; ip: string }
   | { type: "SET_CONNECTION"; connection: ConnectionState }
   | { type: "SET_CLIENTS"; clients: PresenceClient[] }
   | { type: "SET_HISTORY"; entries: HistoryEntryPayload[] }
@@ -87,6 +88,17 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...state,
         aliasRequested: action.alias,
         aliasPending: true,
+        error: null
+      };
+    case "CLEAR_USER_CHAT":
+      return {
+        ...state,
+        timeline: state.timeline.filter(
+          (entry) =>
+            entry.kind !== "chat" ||
+            entry.message.alias !== action.alias ||
+            entry.message.ip !== action.ip
+        ),
         error: null
       };
     case "SET_CONNECTION": {

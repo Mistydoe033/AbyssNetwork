@@ -6,6 +6,7 @@ import { ConnectedClients } from "./components/ConnectedClients";
 import { Timeline } from "./components/Timeline";
 import { chatSocket } from "./lib/chatSocket";
 import { chatReducer, initialChatState } from "./state/chatState";
+import { parseChatInput } from "./utils/chatCommands";
 import {
   isValidAlias,
   isValidMessage,
@@ -76,26 +77,98 @@ function App() {
     dispatch({ type: "REQUEST_ALIAS", alias });
   };
 
+  const sendChatText = (rawText: string): boolean => {
+    const cleaned = sanitizeMessage(rawText);
+    if (!isValidMessage(cleaned)) {
+      dispatch({ type: "SET_ERROR", error: "Message must be 1-1000 chars with no control characters." });
+      return false;
+    }
+
+    const sent = chatSocket.sendChat(cleaned);
+    if (!sent) {
+      dispatch({ type: "SET_ERROR", error: "Still connecting. Message queued." });
+      return false;
+    }
+
+    dispatch({ type: "SET_ERROR", error: null });
+    return true;
+  };
+
   const sendMessage = () => {
     if (!state.aliasConfirmed) {
       dispatch({ type: "SET_ERROR", error: "Set an alias before sending messages." });
       return;
     }
 
-    const cleaned = sanitizeMessage(messageInput);
-    if (!isValidMessage(cleaned)) {
-      dispatch({ type: "SET_ERROR", error: "Message must be 1-1000 chars with no control characters." });
+    const parsed = parseChatInput(messageInput);
+    if (parsed.type === "empty") {
       return;
     }
 
-    const sent = chatSocket.sendChat(cleaned);
-    if (!sent) {
-      dispatch({ type: "SET_ERROR", error: "Still connecting. Message queued." });
+    if (parsed.type === "plain") {
+      if (sendChatText(parsed.text)) {
+        setMessageInput("");
+      }
       return;
     }
 
-    dispatch({ type: "SET_ERROR", error: null });
-    setMessageInput("");
+    if (parsed.type === "help") {
+      dispatch({
+        type: "SET_ERROR",
+        error: "Commands: /help, /nick <alias>, /me <action>, /who, /clear (clears only your messages)"
+      });
+      setMessageInput("");
+      return;
+    }
+
+    if (parsed.type === "nick") {
+      const alias = sanitizeAlias(parsed.alias);
+      if (!isValidAlias(alias)) {
+        dispatch({ type: "SET_ERROR", error: "Usage: /nick <alias>" });
+        return;
+      }
+
+      dispatch({ type: "REQUEST_ALIAS", alias });
+      setMessageInput("");
+      return;
+    }
+
+    if (parsed.type === "me") {
+      const action = sanitizeMessage(parsed.action);
+      if (!action) {
+        dispatch({ type: "SET_ERROR", error: "Usage: /me <action>" });
+        return;
+      }
+
+      if (sendChatText(`* ${state.aliasConfirmed} ${action}`)) {
+        setMessageInput("");
+      }
+      return;
+    }
+
+    if (parsed.type === "who") {
+      const people = state.clients
+        .map((client) => (client.alias ? `${client.alias} (${client.ip})` : client.ip))
+        .join(", ");
+      const summary = people ? `${state.clients.length} online: ${people}` : "No connected clients.";
+      dispatch({ type: "SET_ERROR", error: summary });
+      setMessageInput("");
+      return;
+    }
+
+    if (parsed.type === "clear") {
+      const self = state.clients.find((client) => client.alias === state.aliasConfirmed);
+      if (!self || !self.alias) {
+        dispatch({ type: "SET_ERROR", error: "Cannot resolve your current identity for /clear." });
+        return;
+      }
+
+      dispatch({ type: "CLEAR_USER_CHAT", alias: self.alias, ip: self.ip });
+      setMessageInput("");
+      return;
+    }
+
+    dispatch({ type: "SET_ERROR", error: `Unknown command: /${parsed.name}. Try /help.` });
   };
 
   return (

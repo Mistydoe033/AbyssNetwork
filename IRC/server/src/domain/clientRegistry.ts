@@ -5,6 +5,7 @@ export interface ClientState {
   alias: string | null;
   ip: string;
   connectedAt: string;
+  color: string;
   messageTimestamps: number[];
 }
 
@@ -16,12 +17,13 @@ export class ClientRegistry {
   private readonly clientsBySocketId = new Map<string, ClientState>();
   private readonly socketIdByAlias = new Map<string, string>();
 
-  addClient(clientId: string, ip: string, connectedAt: string): ClientState {
+  addClient(clientId: string, ip: string, connectedAt: string, color: string): ClientState {
     const client: ClientState = {
       clientId,
       alias: null,
       ip,
       connectedAt,
+      color,
       messageTimestamps: []
     };
 
@@ -31,6 +33,15 @@ export class ClientRegistry {
 
   getClient(clientId: string): ClientState | undefined {
     return this.clientsBySocketId.get(clientId);
+  }
+
+  getAliasOwner(alias: string): ClientState | undefined {
+    const ownerClientId = this.socketIdByAlias.get(alias);
+    if (!ownerClientId) {
+      return undefined;
+    }
+
+    return this.clientsBySocketId.get(ownerClientId);
   }
 
   removeClient(clientId: string): ClientState | undefined {
@@ -53,8 +64,32 @@ export class ClientRegistry {
       clientId: client.clientId,
       alias: client.alias,
       ip: client.ip,
-      connectedAt: client.connectedAt
+      connectedAt: client.connectedAt,
+      color: client.color
     }));
+  }
+
+  usedColors(excludeClientId?: string): Set<string> {
+    const colors = new Set<string>();
+
+    for (const client of this.clientsBySocketId.values()) {
+      if (excludeClientId && client.clientId === excludeClientId) {
+        continue;
+      }
+      colors.add(client.color);
+    }
+
+    return colors;
+  }
+
+  setColor(clientId: string, color: string): ClientState | undefined {
+    const client = this.clientsBySocketId.get(clientId);
+    if (!client) {
+      return undefined;
+    }
+
+    client.color = color;
+    return client;
   }
 
   setAliasIfAvailable(clientId: string, alias: string): AliasSetResult {
@@ -69,7 +104,11 @@ export class ClientRegistry {
 
     const ownerClientId = this.socketIdByAlias.get(alias);
     if (ownerClientId && ownerClientId !== clientId) {
-      return { ok: false, reason: "ALIAS_IN_USE" };
+      const ownerClient = this.clientsBySocketId.get(ownerClientId);
+      if (ownerClient) {
+        return { ok: false, reason: "ALIAS_IN_USE" };
+      }
+      this.socketIdByAlias.delete(alias);
     }
 
     if (client.alias && this.socketIdByAlias.get(client.alias) === clientId) {

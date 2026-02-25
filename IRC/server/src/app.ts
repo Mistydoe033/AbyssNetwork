@@ -10,6 +10,7 @@ import type {
 } from "@abyss/irc-shared";
 
 import { ClientRegistry, type ClientState } from "./domain/clientRegistry.js";
+import { pickDistinctColor } from "./domain/colorAllocator.js";
 import { HistoryStore } from "./domain/historyStore.js";
 import { NoticeBuilder } from "./domain/noticeBuilder.js";
 import { getSocketIp } from "./net/ip.js";
@@ -104,12 +105,19 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
       entries: historyStore.snapshot()
     });
 
-    const client = clientRegistry.addClient(socket.id, getSocketIp(socket), nowIso());
+    const clientIp = getSocketIp(socket);
+    const initialColor = pickDistinctColor(clientIp, clientRegistry.usedColors());
+    const client = clientRegistry.addClient(socket.id, clientIp, nowIso(), initialColor);
 
     broadcastPresence();
-    emitNotice(socket.broadcast, noticeBuilder.userJoined(client.clientId, client.ip));
+    emitNotice(socket.broadcast, noticeBuilder.userJoined(client.clientId, client.ip, client.color));
 
     socket.on("register_alias", (payload) => {
+      const currentClient = clientRegistry.getClient(socket.id);
+      if (!currentClient) {
+        return;
+      }
+
       const validatedAlias = validateAlias(payload?.alias);
       if (!validatedAlias.ok || !validatedAlias.value) {
         emitNotice(
@@ -117,6 +125,16 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
           noticeBuilder.error(validatedAlias.error ?? "Invalid alias.", "ALIAS_INVALID")
         );
         return;
+      }
+
+      const aliasOwner = clientRegistry.getAliasOwner(validatedAlias.value);
+      if (
+        aliasOwner &&
+        aliasOwner.clientId !== socket.id &&
+        aliasOwner.ip === currentClient.ip
+      ) {
+        clientRegistry.removeClient(aliasOwner.clientId);
+        io.sockets.sockets.get(aliasOwner.clientId)?.disconnect(true);
       }
 
       const aliasResult = clientRegistry.setAliasIfAvailable(socket.id, validatedAlias.value);
@@ -134,9 +152,22 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
         return;
       }
 
+      const reservedColors = clientRegistry.usedColors(socket.id);
+      const nextColor = pickDistinctColor(
+        `${validatedAlias.value}|${aliasResult.client.ip}`,
+        reservedColors,
+        new Set([aliasResult.client.color])
+      );
+      const updatedClient = clientRegistry.setColor(socket.id, nextColor) ?? aliasResult.client;
+
       emitNotice(
         socket,
-        noticeBuilder.aliasSet(aliasResult.client.clientId, validatedAlias.value, aliasResult.client.ip)
+        noticeBuilder.aliasSet(
+          updatedClient.clientId,
+          validatedAlias.value,
+          updatedClient.ip,
+          updatedClient.color
+        )
       );
       broadcastPresence();
     });
@@ -177,6 +208,7 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
         clientId: currentClient.clientId,
         alias: currentClient.alias ?? currentClient.ip,
         ip: currentClient.ip,
+        color: currentClient.color,
         text: validation.value,
         timestamp: nowIso()
       };
@@ -195,7 +227,12 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
 
       emitNotice(
         socket.broadcast,
-        noticeBuilder.userLeft(disconnected.clientId, disconnected.alias, disconnected.ip)
+        noticeBuilder.userLeft(
+          disconnected.clientId,
+          disconnected.alias,
+          disconnected.ip,
+          disconnected.color
+        )
       );
     });
   });

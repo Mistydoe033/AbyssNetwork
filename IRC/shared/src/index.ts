@@ -15,6 +15,7 @@ export interface PresenceClient {
   alias: string | null;
   ip: string;
   connectedAt: string;
+  color: string;
 }
 
 export interface PresenceUpdatePayload {
@@ -27,6 +28,7 @@ export interface ChatReceivePayload {
   clientId: string;
   alias: string;
   ip: string;
+  color: string;
   text: string;
   timestamp: string;
 }
@@ -37,6 +39,7 @@ export interface SystemNoticePayload {
   message: string;
   timestamp: string;
   actorClientId?: string;
+  actorColor?: string;
   actorColorSeed?: string;
   alias?: string;
   errorKey?: NoticeErrorKey;

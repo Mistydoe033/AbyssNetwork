@@ -7,30 +7,32 @@ function identityColorSeed(alias: string | null, ip: string): string {
 export class NoticeBuilder {
   constructor(private readonly nextSequence: () => number) {}
 
-  userJoined(clientId: string, ip: string): SystemNoticePayload {
+  userJoined(clientId: string, ip: string, color: string): SystemNoticePayload {
     return {
       sequence: this.nextSequence(),
       code: "USER_JOINED",
       message: `Client joined from ${ip}.`,
       timestamp: new Date().toISOString(),
       actorClientId: clientId,
+      actorColor: color,
       actorColorSeed: identityColorSeed(null, ip)
     };
   }
 
-  aliasSet(clientId: string, alias: string, ip: string): SystemNoticePayload {
+  aliasSet(clientId: string, alias: string, ip: string, color: string): SystemNoticePayload {
     return {
       sequence: this.nextSequence(),
       code: "ALIAS_SET",
       message: `Alias set to ${alias}.`,
       timestamp: new Date().toISOString(),
       actorClientId: clientId,
+      actorColor: color,
       actorColorSeed: identityColorSeed(alias, ip),
       alias
     };
   }
 
-  userLeft(clientId: string, alias: string | null, ip: string): SystemNoticePayload {
+  userLeft(clientId: string, alias: string | null, ip: string, color: string): SystemNoticePayload {
     const label = alias ? `${alias} (${ip})` : ip;
 
     return {
@@ -39,6 +41,7 @@ export class NoticeBuilder {
       message: `${label} disconnected.`,
       timestamp: new Date().toISOString(),
       actorClientId: clientId,
+      actorColor: color,
       actorColorSeed: identityColorSeed(alias, ip)
     };
   }
