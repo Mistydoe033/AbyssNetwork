@@ -78,7 +78,6 @@ function App() {
     localStorage.setItem(ALIAS_KEY, alias);
     dispatch({ type: "SET_ALIAS", alias });
     dispatch({ type: "SET_ERROR", error: null });
-    chatSocket.registerAlias(alias, localIpHint);
   };
 
   const sendMessage = () => {
