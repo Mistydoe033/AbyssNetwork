@@ -11,15 +11,11 @@ services:
       - key: IRC_SERVER_HOST
         value: 0.0.0.0
       - key: IRC_ALLOWED_ORIGINS
-        fromService:
-          type: web
-          name: abyss-irc-client
-          envVarKey: RENDER_EXTERNAL_URL
+        value: "*"
 
   - type: web
     name: abyss-irc-client
     runtime: static
-    plan: free
     rootDir: IRC/client
     buildCommand: npm ci && npm run build
     staticPublishPath: dist

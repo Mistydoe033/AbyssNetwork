@@ -95,6 +95,10 @@ function isPrivateIpv4(hostname: string): boolean {
 }
 
 function isOriginAllowed(origin: string | undefined, allowedOrigins: string[]): boolean {
+  if (allowedOrigins.includes("*")) {
+    return true;
+  }
+
   if (!origin || origin === "null") {
     return true;
   }
