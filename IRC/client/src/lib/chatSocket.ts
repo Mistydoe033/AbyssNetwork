@@ -18,6 +18,27 @@ type Cleanup = () => void;
 
 type QueuedEmit = () => void;
 
+function normalizeServerUrl(rawUrl: string): string {
+  const value = rawUrl.trim();
+  if (!value) {
+    return DEFAULT_SERVER_URL;
+  }
+
+  if (value.startsWith("ws://") || value.startsWith("wss://")) {
+    return value;
+  }
+
+  if (value.startsWith("https://")) {
+    return `wss://${value.slice("https://".length)}`;
+  }
+
+  if (value.startsWith("http://")) {
+    return `ws://${value.slice("http://".length)}`;
+  }
+
+  return value;
+}
+
 class ChatSocket {
   private socket: Socket<ServerToClientEvents, ClientToServerEvents>;
   private queue: QueuedEmit[] = [];
@@ -30,7 +51,8 @@ class ChatSocket {
   };
 
   constructor() {
-    const serverUrl = import.meta.env.VITE_IRC_SERVER_URL || DEFAULT_SERVER_URL;
+    const configuredUrl = import.meta.env.VITE_IRC_SERVER_URL || DEFAULT_SERVER_URL;
+    const serverUrl = normalizeServerUrl(configuredUrl);
 
     this.socket = io(serverUrl, {
       transports: ["websocket"],

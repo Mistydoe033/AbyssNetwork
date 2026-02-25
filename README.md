@@ -47,5 +47,9 @@ Steps:
 5. Open `abyss-irc-client` URL and chat.
 
 Notes:
+- Server deploy is optimized for deterministic builds (`npm ci && npm run build`) and starts from compiled output (`dist`).
+- Health check path is `/healthz` for faster Render health verification.
+- Socket origin is restricted to `https://abyss-irc-client.onrender.com` by default.
+- Client accepts Render URL formats and converts `https://...` to `wss://...` automatically for WebSocket transport.
 - Free web service may spin down when idle.
 - Use this for hobby/testing. For always-on behavior, upgrade plan.

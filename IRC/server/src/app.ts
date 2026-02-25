@@ -181,7 +181,16 @@ function canSendMessage(
 export function createChatServer(overrides: Partial<ServerConfig> = {}) {
   const config: ServerConfig = { ...DEFAULT_CONFIG, ...overrides };
 
-  const httpServer = createHttpServer();
+  const httpServer = createHttpServer((req, res) => {
+    if (req.url === "/healthz") {
+      res.writeHead(200, { "content-type": "application/json" });
+      res.end(JSON.stringify({ ok: true }));
+      return;
+    }
+
+    res.writeHead(404, { "content-type": "text/plain; charset=utf-8" });
+    res.end("not found");
+  });
   const io = new Server<ClientToServerEvents, ServerToClientEvents>(httpServer, {
     transports: ["websocket"],
     allowUpgrades: false,

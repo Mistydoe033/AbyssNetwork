@@ -43,8 +43,14 @@ Quick deploy:
 3. Select repository and deploy
 
 The Blueprint provisions both server and client on free plans and wires:
-- `IRC_ALLOWED_ORIGINS` from client service URL
 - `VITE_IRC_SERVER_URL` from server service URL
+- `IRC_ALLOWED_ORIGINS` to `https://abyss-irc-client.onrender.com`
+
+Deployment optimizations:
+- Server build runs `npm ci && npm run build`
+- Server starts from compiled JS (`node dist/index.js`)
+- Render health check uses `/healthz`
+- Client automatically normalizes `https://...` to `wss://...` for websocket transport
 
 ## What this includes
 - Alias registration (`register_alias`)

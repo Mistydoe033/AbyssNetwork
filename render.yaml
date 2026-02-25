@@ -4,14 +4,15 @@ services:
     runtime: node
     plan: free
     rootDir: IRC/server
-    buildCommand: npm ci
+    buildCommand: npm ci && npm run build
     startCommand: npm run start
     autoDeploy: true
+    healthCheckPath: /healthz
     envVars:
       - key: IRC_SERVER_HOST
         value: 0.0.0.0
       - key: IRC_ALLOWED_ORIGINS
-        value: "*"
+        value: https://abyss-irc-client.onrender.com
 
   - type: web
     name: abyss-irc-client
