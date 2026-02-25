@@ -4,7 +4,7 @@ services:
     runtime: node
     plan: free
     rootDir: IRC/server
-    buildCommand: npm ci && npm run build
+    buildCommand: npm install && npm run build
     startCommand: npm run start
     autoDeploy: true
     healthCheckPath: /healthz
@@ -18,7 +18,7 @@ services:
     name: abyss-irc-client
     runtime: static
     rootDir: IRC/client
-    buildCommand: npm ci && npm run build
+    buildCommand: npm install && npm run build
     staticPublishPath: dist
     envVars:
       - key: VITE_IRC_SERVER_URL
