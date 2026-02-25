@@ -1,0 +1,31 @@
+services:
+  - type: web
+    name: abyss-irc-server
+    runtime: node
+    plan: free
+    rootDir: IRC/server
+    buildCommand: npm ci
+    startCommand: npm run start
+    autoDeploy: true
+    envVars:
+      - key: IRC_SERVER_HOST
+        value: 0.0.0.0
+      - key: IRC_ALLOWED_ORIGINS
+        fromService:
+          type: web
+          name: abyss-irc-client
+          envVarKey: RENDER_EXTERNAL_URL
+
+  - type: web
+    name: abyss-irc-client
+    runtime: static
+    plan: free
+    rootDir: IRC/client
+    buildCommand: npm ci && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_IRC_SERVER_URL
+        fromService:
+          type: web
+          name: abyss-irc-server
+          envVarKey: RENDER_EXTERNAL_URL

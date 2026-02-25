@@ -1,0 +1,169 @@
+:root {
+  --abyss-neon: #80ff00;
+  --abyss-soft: #c6ff8d;
+  --abyss-bg: rgba(3, 5, 9, 0.72);
+  --abyss-panel: rgba(11, 14, 20, 0.8);
+  --abyss-border: rgba(128, 255, 0, 0.45);
+  --abyss-error: #ff5b5b;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  color: var(--abyss-neon);
+}
+
+.page {
+  min-height: 100vh;
+  background-position: center;
+  background-size: cover;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1.5rem;
+  padding: 2rem;
+  position: relative;
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+}
+
+.overlayCard {
+  border: 1px solid var(--abyss-border);
+  border-radius: 12px;
+  background: rgba(10, 12, 16, 0.95);
+  padding: 1rem 1.25rem;
+  min-width: 320px;
+}
+
+.mainPanel {
+  width: min(900px, 72vw);
+  min-height: 70vh;
+  border-radius: 14px;
+  border: 1px solid var(--abyss-border);
+  background: var(--abyss-bg);
+  backdrop-filter: blur(5px);
+  display: flex;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+.mainPanel h1 {
+  margin: 0;
+  border-bottom: 2px solid rgba(128, 255, 0, 0.5);
+  padding-bottom: 0.5rem;
+}
+
+.aliasForm {
+  margin-top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  max-width: 320px;
+}
+
+.aliasForm input,
+.composer input {
+  width: 100%;
+  background: rgba(4, 7, 12, 0.7);
+  border: 1px solid var(--abyss-border);
+  border-radius: 8px;
+  color: var(--abyss-soft);
+  padding: 0.65rem;
+}
+
+.aliasForm button,
+.composer button {
+  background: rgba(111, 0, 255, 0.35);
+  color: var(--abyss-neon);
+  border: 1px solid var(--abyss-border);
+  border-radius: 8px;
+  padding: 0.6rem 0.9rem;
+  cursor: pointer;
+}
+
+.chatHeader {
+  margin-top: 0.5rem;
+  color: var(--abyss-soft);
+}
+
+.messages {
+  margin-top: 0.75rem;
+  flex: 1;
+  min-height: 45vh;
+  overflow: auto;
+  border-radius: 8px;
+  border: 1px solid rgba(128, 255, 0, 0.25);
+  background: var(--abyss-panel);
+  padding: 0.75rem;
+}
+
+.messageRow,
+.noticeRow {
+  margin-bottom: 0.45rem;
+  word-break: break-word;
+}
+
+.messageIp {
+  color: #b8e58f;
+  margin-left: 0.2rem;
+}
+
+.noticeRow {
+  color: #8fdbff;
+}
+
+.composer {
+  margin-top: 0.75rem;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 0.75rem;
+}
+
+.errorBar {
+  margin-top: 0.75rem;
+  color: var(--abyss-error);
+}
+
+.clientsPanel {
+  width: min(300px, 24vw);
+  min-height: 40vh;
+  border-radius: 12px;
+  border: 1px solid var(--abyss-border);
+  background: var(--abyss-bg);
+  backdrop-filter: blur(5px);
+  padding: 0.9rem;
+}
+
+.clientsPanel h2 {
+  margin-top: 0;
+}
+
+.clientsList {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+@media (max-width: 980px) {
+  .page {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .mainPanel,
+  .clientsPanel {
+    width: 100%;
+  }
+}

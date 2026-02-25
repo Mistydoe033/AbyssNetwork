@@ -1,0 +1,8 @@
+.venv/
+react/node_modules/
+react/build/
+IRC/client/node_modules/
+IRC/client/dist/
+IRC/server/node_modules/
+**/__pycache__/
+*.pyc

@@ -1,0 +1,6 @@
+{
+  "name": "@abyss/irc-shared",
+  "version": "1.0.1",
+  "private": true,
+  "types": "src/index.ts"
+}
