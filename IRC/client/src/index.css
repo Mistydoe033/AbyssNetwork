@@ -120,12 +120,12 @@ body {
   font-size: 0.9rem;
 }
 
-.messageIp {
-  color: #b8e58f;
+.messageBody {
+  color: var(--abyss-soft);
 }
 
 .noticeRow {
-  color: #8fdbff;
+  color: var(--abyss-soft);
 }
 
 .composer {

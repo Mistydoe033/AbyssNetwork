@@ -6,9 +6,11 @@ import { Server, type Socket } from "socket.io";
 import type {
   ChatReceivePayload,
   ClientToServerEvents,
+  HistoryEntryPayload,
   PresenceClient,
   ServerToClientEvents,
-  SystemNoticeCode
+  SystemNoticeCode,
+  SystemNoticePayload
 } from "@abyss/irc-shared";
 
 import { validateAlias, validateMessage } from "./validation.js";
@@ -178,6 +180,10 @@ function canSendMessage(
   return true;
 }
 
+type NoticeTarget = {
+  emit: (event: "system_notice", payload: SystemNoticePayload) => void;
+};
+
 export function createChatServer(overrides: Partial<ServerConfig> = {}) {
   const config: ServerConfig = { ...DEFAULT_CONFIG, ...overrides };
 
@@ -206,6 +212,17 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
   });
 
   const clients = new Map<string, ClientState>();
+  const history: HistoryEntryPayload[] = [];
+  let sequence = 0;
+
+  const nextSequence = (): number => {
+    sequence += 1;
+    return sequence;
+  };
+
+  const appendHistory = (entry: HistoryEntryPayload) => {
+    history.push(entry);
+  };
 
   const broadcastPresence = () => {
     io.emit("presence_update", {
@@ -213,28 +230,40 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
     });
   };
 
-  type NoticeTarget = {
-    emit: (
-      event: "system_notice",
-      payload: { code: SystemNoticeCode; message: string; timestamp: string; actorClientId?: string }
-    ) => void;
-  };
-
   const emitNotice = (
     target: NoticeTarget,
     code: SystemNoticeCode,
     message: string,
-    actorClientId?: string
-  ) => {
-    target.emit("system_notice", {
+    actorClientId?: string,
+    persist = false
+  ): SystemNoticePayload => {
+    const notice: SystemNoticePayload = {
+      sequence: nextSequence(),
       code,
       message,
       timestamp: nowIso(),
       ...(actorClientId ? { actorClientId } : {})
-    });
+    };
+
+    target.emit("system_notice", notice);
+
+    if (persist) {
+      appendHistory({ kind: "notice", notice });
+    }
+
+    return notice;
+  };
+
+  const emitChat = (message: ChatReceivePayload) => {
+    io.emit("chat_receive", message);
+    appendHistory({ kind: "chat", message });
   };
 
   io.on("connection", (socket) => {
+    socket.emit("history_snapshot", {
+      entries: [...history]
+    });
+
     const state: ClientState = {
       clientId: socket.id,
       alias: null,
@@ -245,7 +274,7 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
 
     clients.set(socket.id, state);
     broadcastPresence();
-    emitNotice(socket.broadcast, "USER_JOINED", `Client joined from ${state.ip}.`, state.clientId);
+    emitNotice(socket.broadcast, "USER_JOINED", `Client joined from ${state.ip}.`, state.clientId, true);
 
     socket.on("register_alias", (payload) => {
       const result = validateAlias(payload?.alias);
@@ -265,7 +294,7 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
       }
 
       current.alias = result.value;
-      emitNotice(socket, "ALIAS_SET", `Alias set to ${result.value}.`, current.clientId);
+      emitNotice(socket, "ALIAS_SET", `Alias set to ${result.value}.`, current.clientId, true);
       broadcastPresence();
     });
 
@@ -294,6 +323,7 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
       }
 
       const message: ChatReceivePayload = {
+        sequence: nextSequence(),
         messageId: randomUUID(),
         clientId: current.clientId,
         alias: current.alias ?? current.ip,
@@ -302,7 +332,7 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
         timestamp: nowIso()
       };
 
-      io.emit("chat_receive", message);
+      emitChat(message);
     });
 
     socket.on("disconnect", () => {
@@ -312,7 +342,7 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
 
       if (disconnected) {
         const label = disconnected.alias ? `${disconnected.alias} (${disconnected.ip})` : disconnected.ip;
-        emitNotice(socket.broadcast, "USER_LEFT", `${label} disconnected.`, disconnected.clientId);
+        emitNotice(socket.broadcast, "USER_LEFT", `${label} disconnected.`, disconnected.clientId, true);
       }
     });
   });
@@ -360,6 +390,7 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
     start,
     stop,
     getPort,
-    clients
+    clients,
+    history
   };
 }

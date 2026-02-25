@@ -21,6 +21,7 @@ export interface PresenceUpdatePayload {
 }
 
 export interface ChatReceivePayload {
+  sequence: number;
   messageId: string;
   clientId: string;
   alias: string;
@@ -30,10 +31,19 @@ export interface ChatReceivePayload {
 }
 
 export interface SystemNoticePayload {
+  sequence: number;
   code: SystemNoticeCode;
   message: string;
   timestamp: string;
   actorClientId?: string;
+}
+
+export type HistoryEntryPayload =
+  | { kind: "chat"; message: ChatReceivePayload }
+  | { kind: "notice"; notice: SystemNoticePayload };
+
+export interface HistorySnapshotPayload {
+  entries: HistoryEntryPayload[];
 }
 
 export interface ClientToServerEvents {
@@ -42,6 +52,7 @@ export interface ClientToServerEvents {
 }
 
 export interface ServerToClientEvents {
+  history_snapshot: (payload: HistorySnapshotPayload) => void;
   presence_update: (payload: PresenceUpdatePayload) => void;
   chat_receive: (payload: ChatReceivePayload) => void;
   system_notice: (payload: SystemNoticePayload) => void;

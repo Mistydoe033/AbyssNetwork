@@ -1,7 +1,5 @@
 import { FormEvent, useEffect, useMemo, useReducer, useState } from "react";
 
-import type { PresenceClient } from "@abyss/irc-shared";
-
 import bgImage from "./assets/HBG.jpg";
 import { chatSocket } from "./lib/chatSocket";
 import { chatReducer, initialChatState } from "./state/chatState";
@@ -11,7 +9,7 @@ import {
   sanitizeAlias,
   sanitizeMessage
 } from "./utils/validation";
-import { formatTimestampMinutes, getUserColor } from "./utils/userFormatting";
+import { formatTimestampSeconds, getUserColor } from "./utils/userFormatting";
 
 const ALIAS_KEY = "abyss_alias";
 
@@ -27,6 +25,10 @@ function App() {
   useEffect(() => {
     const stopConnection = chatSocket.onConnection((connection) => {
       dispatch({ type: "SET_CONNECTION", connection });
+    });
+
+    const stopHistory = chatSocket.onHistory((payload) => {
+      dispatch({ type: "SET_HISTORY", entries: payload.entries });
     });
 
     const stopPresence = chatSocket.onPresence((payload) => {
@@ -46,6 +48,7 @@ function App() {
 
     return () => {
       stopConnection();
+      stopHistory();
       stopPresence();
       stopMessages();
       stopNotices();
@@ -127,25 +130,36 @@ function App() {
           <>
             <div className="chatHeader">Logged in as {state.alias}</div>
             <div className="messages">
-              {state.messages.map((entry) => (
-                <div className="messageRow" key={entry.messageId}>
-                  <span className="timestamp">[{formatTimestampMinutes(entry.timestamp)}]</span>{" "}
-                  <strong style={{ color: getUserColor(entry.clientId) }}>{entry.alias}</strong>
-                  <span className="messageIp"> ({entry.ip})</span>
-                  <span>: {entry.text}</span>
-                </div>
-              ))}
+              {state.timeline.map((entry) => {
+                if (entry.kind === "chat") {
+                  const message = entry.message;
+                  const color = getUserColor(message.clientId);
 
-              {state.notices.map((notice, index) => (
-                <div
-                  className="noticeRow"
-                  key={`${notice.timestamp}-${index}`}
-                  style={{ color: getUserColor(notice.actorClientId) }}
-                >
-                  <span className="timestamp">[{formatTimestampMinutes(notice.timestamp)}]</span>{" "}
-                  [{notice.code}] {notice.message}
-                </div>
-              ))}
+                  return (
+                    <div className="messageRow" key={`chat-${message.sequence}`}>
+                      <span className="timestamp">[{formatTimestampSeconds(message.timestamp)}]</span>{" "}
+                      <span className="messageBody" style={{ color }}>
+                        <strong>{message.alias}</strong>
+                        <span> ({message.ip})</span>
+                        <span>: {message.text}</span>
+                      </span>
+                    </div>
+                  );
+                }
+
+                const notice = entry.notice;
+
+                return (
+                  <div
+                    className="noticeRow"
+                    key={`notice-${notice.sequence}`}
+                    style={{ color: getUserColor(notice.actorClientId) }}
+                  >
+                    <span className="timestamp">[{formatTimestampSeconds(notice.timestamp)}]</span>{" "}
+                    [{notice.code}] {notice.message}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="composer">

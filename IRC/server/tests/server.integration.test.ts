@@ -4,6 +4,7 @@ import { io, type Socket } from "socket.io-client";
 import type {
   ChatReceivePayload,
   ClientToServerEvents,
+  HistorySnapshotPayload,
   PresenceUpdatePayload,
   ServerToClientEvents
 } from "@abyss/irc-shared";
@@ -100,6 +101,7 @@ describe("chat server", () => {
 
     expect(message.alias).toBe("Alpha");
     expect(message.ip).toBe("192.168.1.10");
+    expect(message.sequence).toBeGreaterThan(0);
 
     const disconnectPresencePromise = waitForEvent<PresenceUpdatePayload>(
       clientA,
@@ -109,5 +111,57 @@ describe("chat server", () => {
 
     clientB.disconnect();
     await disconnectPresencePromise;
+  });
+
+  it("replays history to newly connected clients", async () => {
+    const port = server.getPort();
+    const url = `ws://127.0.0.1:${port}`;
+
+    clientA = await connectClient(url);
+    clientA.emit("register_alias", { alias: "Alpha", clientIpHint: "192.168.1.10" });
+
+    const messagePromise = waitForEvent<ChatReceivePayload>(
+      clientA,
+      "chat_receive",
+      (payload) => payload.text === "persist me"
+    );
+
+    clientA.emit("chat_send", { text: "persist me" });
+    const sentMessage = await messagePromise;
+
+    const snapshotPromise = new Promise<HistorySnapshotPayload>((resolve, reject) => {
+      const socket = io(url, {
+        transports: ["websocket"],
+        reconnection: false,
+        timeout: 3000
+      });
+
+      clientB = socket;
+
+      const timer = setTimeout(() => {
+        socket.disconnect();
+        reject(new Error("Timed out waiting for history_snapshot"));
+      }, 4000);
+
+      socket.once("history_snapshot", (payload) => {
+        clearTimeout(timer);
+        resolve(payload);
+      });
+
+      socket.once("connect_error", (error) => {
+        clearTimeout(timer);
+        reject(error);
+      });
+    });
+
+    const snapshot = await snapshotPromise;
+
+    const historyMessage = snapshot.entries.find(
+      (entry): entry is { kind: "chat"; message: ChatReceivePayload } =>
+        entry.kind === "chat" && entry.message.text === "persist me"
+    );
+
+    expect(historyMessage).toBeDefined();
+    expect(historyMessage?.message.sequence).toBe(sentMessage.sequence);
   });
 });

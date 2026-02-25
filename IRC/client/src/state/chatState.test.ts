@@ -20,20 +20,64 @@ describe("chatReducer", () => {
     expect(state.clients[0].alias).toBe("Alpha");
   });
 
-  it("appends incoming messages", () => {
-    const state = chatReducer(initialChatState, {
+  it("keeps timeline ordered by sequence", () => {
+    const withMessage = chatReducer(initialChatState, {
       type: "ADD_MESSAGE",
       message: {
-        messageId: "id-1",
+        sequence: 2,
+        messageId: "id-2",
         clientId: "abc",
         alias: "Alpha",
         ip: "127.0.0.1",
         text: "hello",
-        timestamp: "2026-01-01T00:00:00.000Z"
+        timestamp: "2026-01-01T00:00:02.000Z"
       }
     });
 
-    expect(state.messages).toHaveLength(1);
-    expect(state.messages[0].text).toBe("hello");
+    const withNotice = chatReducer(withMessage, {
+      type: "ADD_NOTICE",
+      notice: {
+        sequence: 1,
+        code: "ALIAS_SET",
+        message: "Alias set to Alpha.",
+        timestamp: "2026-01-01T00:00:01.000Z",
+        actorClientId: "abc"
+      }
+    });
+
+    expect(withNotice.timeline).toHaveLength(2);
+    expect(withNotice.timeline[0].kind).toBe("notice");
+    expect(withNotice.timeline[1].kind).toBe("chat");
+  });
+
+  it("deduplicates events by sequence", () => {
+    const first = chatReducer(initialChatState, {
+      type: "ADD_MESSAGE",
+      message: {
+        sequence: 10,
+        messageId: "id-10",
+        clientId: "abc",
+        alias: "Alpha",
+        ip: "127.0.0.1",
+        text: "first",
+        timestamp: "2026-01-01T00:00:10.000Z"
+      }
+    });
+
+    const second = chatReducer(first, {
+      type: "ADD_MESSAGE",
+      message: {
+        sequence: 10,
+        messageId: "id-10b",
+        clientId: "abc",
+        alias: "Alpha",
+        ip: "127.0.0.1",
+        text: "duplicate",
+        timestamp: "2026-01-01T00:00:10.000Z"
+      }
+    });
+
+    expect(second.timeline).toHaveLength(1);
+    expect(second.timeline[0].kind).toBe("chat");
   });
 });

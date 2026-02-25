@@ -1,5 +1,6 @@
 import type {
   ChatReceivePayload,
+  HistoryEntryPayload,
   PresenceClient,
   SystemNoticePayload
 } from "@abyss/irc-shared";
@@ -14,8 +15,7 @@ export interface ChatState {
   alias: string | null;
   connection: ConnectionState;
   clients: PresenceClient[];
-  messages: ChatReceivePayload[];
-  notices: SystemNoticePayload[];
+  timeline: HistoryEntryPayload[];
   error: string | null;
 }
 
@@ -27,8 +27,7 @@ export const initialChatState: ChatState = {
     attempt: 0
   },
   clients: [],
-  messages: [],
-  notices: [],
+  timeline: [],
   error: null
 };
 
@@ -36,9 +35,44 @@ export type ChatAction =
   | { type: "SET_ALIAS"; alias: string }
   | { type: "SET_CONNECTION"; connection: ConnectionState }
   | { type: "SET_CLIENTS"; clients: PresenceClient[] }
+  | { type: "SET_HISTORY"; entries: HistoryEntryPayload[] }
   | { type: "ADD_MESSAGE"; message: ChatReceivePayload }
   | { type: "ADD_NOTICE"; notice: SystemNoticePayload }
   | { type: "SET_ERROR"; error: string | null };
+
+function entrySequence(entry: HistoryEntryPayload): number {
+  return entry.kind === "chat" ? entry.message.sequence : entry.notice.sequence;
+}
+
+function sortAndDeduplicate(entries: HistoryEntryPayload[]): HistoryEntryPayload[] {
+  const sorted = [...entries].sort((a, b) => entrySequence(a) - entrySequence(b));
+  const deduped: HistoryEntryPayload[] = [];
+
+  for (const entry of sorted) {
+    const sequence = entrySequence(entry);
+    const previous = deduped[deduped.length - 1];
+    if (previous && entrySequence(previous) === sequence) {
+      continue;
+    }
+    deduped.push(entry);
+  }
+
+  return deduped;
+}
+
+function appendOrdered(stateEntries: HistoryEntryPayload[], nextEntry: HistoryEntryPayload): HistoryEntryPayload[] {
+  const nextSequence = entrySequence(nextEntry);
+  if (stateEntries.some((entry) => entrySequence(entry) === nextSequence)) {
+    return stateEntries;
+  }
+
+  const last = stateEntries[stateEntries.length - 1];
+  if (!last || entrySequence(last) < nextSequence) {
+    return [...stateEntries, nextEntry];
+  }
+
+  return sortAndDeduplicate([...stateEntries, nextEntry]);
+}
 
 export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
@@ -57,15 +91,20 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         ...state,
         clients: action.clients
       };
+    case "SET_HISTORY":
+      return {
+        ...state,
+        timeline: sortAndDeduplicate(action.entries)
+      };
     case "ADD_MESSAGE":
       return {
         ...state,
-        messages: [...state.messages, action.message]
+        timeline: appendOrdered(state.timeline, { kind: "chat", message: action.message })
       };
     case "ADD_NOTICE":
       return {
         ...state,
-        notices: [...state.notices, action.notice]
+        timeline: appendOrdered(state.timeline, { kind: "notice", notice: action.notice })
       };
     case "SET_ERROR":
       return {

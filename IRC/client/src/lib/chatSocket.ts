@@ -7,7 +7,8 @@ import type {
   RegisterAliasPayload,
   ServerToClientEvents,
   SystemNoticePayload,
-  ChatReceivePayload
+  ChatReceivePayload,
+  HistorySnapshotPayload
 } from "@abyss/irc-shared";
 
 import type { ConnectionState } from "../state/chatState";
@@ -115,6 +116,13 @@ class ChatSocket {
     listener(this.state);
     return () => {
       this.connectionListeners.delete(listener);
+    };
+  }
+
+  onHistory(listener: (payload: HistorySnapshotPayload) => void): Cleanup {
+    this.socket.on("history_snapshot", listener);
+    return () => {
+      this.socket.off("history_snapshot", listener);
     };
   }
 
