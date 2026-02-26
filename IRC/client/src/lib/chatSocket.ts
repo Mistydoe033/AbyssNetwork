@@ -27,7 +27,7 @@ import type {
   BotInvokePayload
 } from "@abyss/irc-shared";
 
-const DEFAULT_SERVER_URL = "ws://127.0.0.1:7001";
+const DEFAULT_SERVER_URL = "ws://localhost:10000";
 
 function normalizeServerUrl(raw: string): string {
   const value = raw.trim();
