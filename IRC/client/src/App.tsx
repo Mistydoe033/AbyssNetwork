@@ -118,6 +118,8 @@ function App() {
   const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
+    chatSocket.connect();
+
     const stopConnect = chatSocket.onConnect((isConnected) => {
       setConnected(isConnected);
       if (isConnected) {
@@ -162,13 +164,18 @@ function App() {
     const stopSnapshot = chatSocket.onNetworkSnapshot((payload) => {
       setChannels(payload.channels);
       setDms(payload.dms);
-      if (!activeView) {
-        if (payload.channels[0]) {
-          setActiveView({ kind: "channel", channel: payload.channels[0].channel });
-        } else if (payload.dms[0]) {
-          setActiveView({ kind: "dm", convoId: payload.dms[0].convoId });
+      setActiveView((previous) => {
+        if (previous) {
+          return previous;
         }
-      }
+        if (payload.channels[0]) {
+          return { kind: "channel", channel: payload.channels[0].channel };
+        }
+        if (payload.dms[0]) {
+          return { kind: "dm", convoId: payload.dms[0].convoId };
+        }
+        return previous;
+      });
     });
 
     const stopChannel = chatSocket.onChannelEvent((payload) => {
@@ -221,8 +228,9 @@ function App() {
       stopHistory();
       stopBot();
       stopError();
+      chatSocket.disconnect();
     };
-  }, [activeView, identity.deviceId, identity.publicKey]);
+  }, [identity.deviceId, identity.publicKey]);
 
   useEffect(() => {
     if (!activeView) {

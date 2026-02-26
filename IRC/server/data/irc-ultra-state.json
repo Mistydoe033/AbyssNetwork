@@ -1,9 +1,61 @@
 {
-  "devices": {},
-  "aliases": {},
-  "sessions": {},
-  "channels": {},
-  "channelMembers": {},
+  "devices": {
+    "mm2ue0g7-lmegr0jo": {
+      "publicKey": "UTR5ikJw30xsVYvB4Z3EF5gZovih+n0ceWE8qoOtgaI=",
+      "createdAt": "2026-02-26T02:29:06.095Z",
+      "lastSeenAt": "2026-02-26T02:29:08.673Z"
+    }
+  },
+  "aliases": {
+    "misty": {
+      "currentDeviceId": "mm2ue0g7-lmegr0jo",
+      "activeSessionId": "fff75207-fbcf-4a44-8500-bdaded7557f6",
+      "lastIp": "127.0.0.1",
+      "claimedAt": "2026-02-26T02:29:14.051Z",
+      "reclaimNonce": "42e16856-714f-43f6-b80c-84f99cd16984"
+    }
+  },
+  "sessions": {
+    "791259f6-d525-40c6-a13f-1125c1fd1b2e": {
+      "sessionId": "791259f6-d525-40c6-a13f-1125c1fd1b2e",
+      "deviceId": "mm2ue0g7-lmegr0jo",
+      "alias": null,
+      "ip": "127.0.0.1",
+      "connectedAt": "2026-02-26T02:29:06.095Z",
+      "disconnectedAt": "2026-02-26T02:29:06.128Z",
+      "resumeToken": "9120755e-c587-42ec-9e62-abc901add6d0"
+    },
+    "fff75207-fbcf-4a44-8500-bdaded7557f6": {
+      "sessionId": "fff75207-fbcf-4a44-8500-bdaded7557f6",
+      "deviceId": "mm2ue0g7-lmegr0jo",
+      "alias": "misty",
+      "ip": "127.0.0.1",
+      "connectedAt": "2026-02-26T02:29:08.673Z",
+      "disconnectedAt": null,
+      "resumeToken": "938fc252-4712-4cfd-9f59-87b7b20dba19"
+    }
+  },
+  "channels": {
+    "#lobby": {
+      "channelId": "#lobby:1772072954051",
+      "name": "#lobby",
+      "topic": "",
+      "modes": [],
+      "ownerAlias": "misty",
+      "createdAt": "2026-02-26T02:29:14.051Z"
+    }
+  },
+  "channelMembers": {
+    "#lobby": {
+      "misty": {
+        "alias": "misty",
+        "role": "OWNER",
+        "joinedAt": "2026-02-26T02:29:14.051Z",
+        "mutedUntil": null,
+        "isBanned": false
+      }
+    }
+  },
   "dmConversations": {},
   "messages": [],
   "moderationActions": [],

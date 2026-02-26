@@ -1275,6 +1275,10 @@ export function createChatServer(overrides: Partial<ServerConfig> = {}) {
       });
       return;
     }
+    if (url.startsWith("/socket.io")) {
+      // Let Socket.IO's own upgrade handler process this request.
+      return;
+    }
     socket.destroy();
   });
 

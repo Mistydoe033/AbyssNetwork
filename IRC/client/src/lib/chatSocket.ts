@@ -24,22 +24,19 @@ import type {
   ServerToClientEvents,
   SessionReadyPayload,
   TypingStatePayload,
-  BotInvokePayload
+  BotInvokePayload,
 } from "@abyss/irc-shared";
 
-const DEFAULT_SERVER_URL = "ws://localhost:10000";
+const DEFAULT_SERVER_URL = "http://127.0.0.1:7001";
 
 function normalizeServerUrl(raw: string): string {
   const value = raw.trim();
-  if (!value) {
-    return DEFAULT_SERVER_URL;
-  }
-  if (value.startsWith("http://")) {
-    return `ws://${value.slice("http://".length)}`;
-  }
-  if (value.startsWith("https://")) {
-    return `wss://${value.slice("https://".length)}`;
-  }
+  if (!value) return DEFAULT_SERVER_URL;
+
+  // socket.io expects http(s) base URL, not ws(s)
+  if (value.startsWith("ws://")) return `http://${value.slice("ws://".length)}`;
+  if (value.startsWith("wss://")) return `https://${value.slice("wss://".length)}`;
+
   return value;
 }
 
@@ -47,30 +44,39 @@ type Cleanup = () => void;
 
 export class ChatSocket {
   private readonly socket: Socket<ServerToClientEvents, ClientToServerEvents>;
+  private readonly serverUrl: string;
   private connectionTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     const configured = import.meta.env.VITE_IRC_SERVER_URL || DEFAULT_SERVER_URL;
-    this.socket = io(normalizeServerUrl(configured), {
+    this.serverUrl = normalizeServerUrl(configured);
+
+    this.socket = io(this.serverUrl, {
       transports: ["websocket"],
+      autoConnect: false,
       reconnection: true,
       reconnectionDelay: 500,
       reconnectionDelayMax: 5000,
-      timeout: 10000,
-      autoConnect: false
+      timeout: 10_000
     });
+
+    this.socket.on("connect", () => console.log("[socket] connected", this.socket.id));
+    this.socket.on("disconnect", (reason) => console.log("[socket] disconnected:", reason));
+    this.socket.on("connect_error", (error) => console.error("[socket] connect_error:", error));
+    this.socket.io.on("reconnect_attempt", (attempt) => {
+      console.log("[socket.io] reconnect attempt:", attempt);
+    });
+    this.socket.io.on("error", (error: Error) => console.error("[socket.io] error:", error));
   }
 
   private setupConnectionTimeout(): void {
-    if (this.connectionTimeout) {
-      clearTimeout(this.connectionTimeout);
-    }
-    
+    if (this.connectionTimeout) clearTimeout(this.connectionTimeout);
+
     this.connectionTimeout = setTimeout(() => {
-      if (this.socket && !this.socket.connected) {
-        console.error('WebSocket connection timeout - check server URL and network connectivity');
+      if (!this.socket.connected) {
+        console.error("[socket] connection timeout. Check server URL / CORS / network.");
       }
-    }, 10000);
+    }, 10_000);
   }
 
   connect(): void {
@@ -78,10 +84,17 @@ export class ChatSocket {
       clearTimeout(this.connectionTimeout);
       this.connectionTimeout = null;
     }
-    
+    console.log("[socket] connecting to", this.serverUrl);
     this.socket.connect();
-    
     this.setupConnectionTimeout();
+  }
+
+  disconnect(): void {
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+    this.socket.disconnect();
   }
 
   onConnect(listener: (connected: boolean) => void): Cleanup {
@@ -92,7 +105,7 @@ export class ChatSocket {
       }
       listener(true);
     };
-    
+
     const onDisconnect = () => {
       if (this.connectionTimeout) {
         clearTimeout(this.connectionTimeout);
@@ -100,10 +113,13 @@ export class ChatSocket {
       }
       listener(false);
     };
-    
+
     this.socket.on("connect", onConnect);
     this.socket.on("disconnect", onDisconnect);
+
+    // initial state
     listener(this.socket.connected);
+
     return () => {
       this.socket.off("connect", onConnect);
       this.socket.off("disconnect", onDisconnect);
@@ -158,51 +174,39 @@ export class ChatSocket {
   helloDevice(payload: DeviceHelloPayload): void {
     this.socket.emit("hello_device", payload);
   }
-
   claimAlias(payload: ClaimAliasPayload): void {
     this.socket.emit("claim_alias", payload);
   }
-
   commandExec(payload: CommandExecPayload): void {
     this.socket.emit("command_exec", payload);
   }
-
   joinChannel(payload: JoinChannelPayload): void {
     this.socket.emit("join_channel", payload);
   }
-
   partChannel(payload: PartChannelPayload): void {
     this.socket.emit("part_channel", payload);
   }
-
   sendChannelMessage(payload: SendChannelMessagePayload): void {
     this.socket.emit("send_channel_message", payload);
   }
-
   sendDmMessage(payload: SendDmMessagePayload): void {
     this.socket.emit("send_dm_message", payload);
   }
-
   reactToggle(payload: ReactTogglePayload): void {
     this.socket.emit("react_toggle", payload);
   }
-
   messageEdit(payload: MessageEditPayload): void {
     this.socket.emit("message_edit", payload);
   }
-
   messageDelete(payload: MessageDeletePayload): void {
     this.socket.emit("message_delete", payload);
   }
-
   historyFetch(payload: HistoryFetchPayload): void {
     this.socket.emit("history_fetch", payload);
   }
-
   typingState(payload: TypingStatePayload): void {
     this.socket.emit("typing_state", payload);
   }
-
   botInvoke(payload: BotInvokePayload): void {
     this.socket.emit("bot_invoke", payload);
   }
