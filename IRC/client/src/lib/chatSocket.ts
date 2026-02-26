@@ -47,6 +47,7 @@ type Cleanup = () => void;
 
 export class ChatSocket {
   private readonly socket: Socket<ServerToClientEvents, ClientToServerEvents>;
+  private connectionTimeout: ReturnType<typeof setTimeout> | null = null;
 
   constructor() {
     const configured = import.meta.env.VITE_IRC_SERVER_URL || DEFAULT_SERVER_URL;
@@ -54,13 +55,52 @@ export class ChatSocket {
       transports: ["websocket"],
       reconnection: true,
       reconnectionDelay: 500,
-      reconnectionDelayMax: 5000
+      reconnectionDelayMax: 5000,
+      timeout: 10000,
+      autoConnect: false
     });
   }
 
+  private setupConnectionTimeout(): void {
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+    }
+    
+    this.connectionTimeout = setTimeout(() => {
+      if (this.socket && !this.socket.connected) {
+        console.error('WebSocket connection timeout - check server URL and network connectivity');
+      }
+    }, 10000);
+  }
+
+  connect(): void {
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+    
+    this.socket.connect();
+    
+    this.setupConnectionTimeout();
+  }
+
   onConnect(listener: (connected: boolean) => void): Cleanup {
-    const onConnect = () => listener(true);
-    const onDisconnect = () => listener(false);
+    const onConnect = () => {
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+      listener(true);
+    };
+    
+    const onDisconnect = () => {
+      if (this.connectionTimeout) {
+        clearTimeout(this.connectionTimeout);
+        this.connectionTimeout = null;
+      }
+      listener(false);
+    };
+    
     this.socket.on("connect", onConnect);
     this.socket.on("disconnect", onDisconnect);
     listener(this.socket.connected);
