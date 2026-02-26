@@ -1,0 +1,23 @@
+{
+  "devices": {},
+  "aliases": {},
+  "sessions": {},
+  "channels": {},
+  "channelMembers": {},
+  "dmConversations": {},
+  "messages": [],
+  "moderationActions": [],
+  "botApps": {
+    "echo": {
+      "botId": "echo",
+      "name": "EchoBot",
+      "version": "1.0.0",
+      "permissions": [
+        "CHANNEL_WRITE"
+      ],
+      "enabledChannels": [],
+      "createdAt": "2026-02-26T01:51:11.290Z"
+    }
+  },
+  "auditEvents": []
+}
