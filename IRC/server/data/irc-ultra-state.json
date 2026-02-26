@@ -9,7 +9,7 @@
   "aliases": {
     "misty": {
       "currentDeviceId": "mm2ue0g7-lmegr0jo",
-      "activeSessionId": "fff75207-fbcf-4a44-8500-bdaded7557f6",
+      "activeSessionId": null,
       "lastIp": "127.0.0.1",
       "claimedAt": "2026-02-26T02:29:14.051Z",
       "reclaimNonce": "42e16856-714f-43f6-b80c-84f99cd16984"
@@ -31,7 +31,7 @@
       "alias": "misty",
       "ip": "127.0.0.1",
       "connectedAt": "2026-02-26T02:29:08.673Z",
-      "disconnectedAt": null,
+      "disconnectedAt": "2026-02-26T02:32:07.113Z",
       "resumeToken": "938fc252-4712-4cfd-9f59-87b7b20dba19"
     }
   },

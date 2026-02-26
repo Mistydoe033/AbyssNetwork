@@ -34,10 +34,22 @@ function normalizeServerUrl(raw: string): string {
   if (!value) return DEFAULT_SERVER_URL;
 
   // socket.io expects http(s) base URL, not ws(s)
-  if (value.startsWith("ws://")) return `http://${value.slice("ws://".length)}`;
-  if (value.startsWith("wss://")) return `https://${value.slice("wss://".length)}`;
+  const candidate = value.startsWith("ws://")
+    ? `http://${value.slice("ws://".length)}`
+    : value.startsWith("wss://")
+      ? `https://${value.slice("wss://".length)}`
+      : value;
 
-  return value;
+  try {
+    const url = new URL(candidate);
+    // Render web services are only exposed on standard HTTPS/WSS ports.
+    if (url.hostname.endsWith(".onrender.com") && url.port) {
+      url.port = "";
+    }
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return candidate;
+  }
 }
 
 type Cleanup = () => void;
